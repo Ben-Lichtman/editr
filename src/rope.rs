@@ -202,10 +202,10 @@ impl Node {
 		}
 	}
 
-	fn flatten_inplace(&mut self) {
+	fn flatten(&mut self) {
 		if let Node::Internal(inner) = self {
-			inner.children.0.flatten_inplace();
-			inner.children.1.flatten_inplace();
+			inner.children.0.flatten();
+			inner.children.1.flatten();
 
 			match (&mut inner.children.0, &mut inner.children.1) {
 				(Node::Leaf(left), Node::Leaf(right)) => {
