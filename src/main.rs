@@ -22,6 +22,6 @@ fn main() {
 	r.remove_range(0, 2).unwrap();
 	println!("{:#?}", r);
 
-	r.flatten().unwrap();
+	r.flatten_inplace().unwrap();
 	println!("{:#?}", r);
 }
