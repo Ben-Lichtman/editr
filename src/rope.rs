@@ -181,10 +181,10 @@ impl Node {
 		}
 	}
 
-	fn flatten(&mut self) {
+	fn flatten_inplace(&mut self) {
 		if let Node::Internal(inner) = self {
-			inner.children.0.flatten();
-			inner.children.1.flatten();
+			inner.children.0.flatten_inplace();
+			inner.children.1.flatten_inplace();
 
 			match (&mut inner.children.0, &mut inner.children.1) {
 				(Node::Leaf(left), Node::Leaf(right)) => {
@@ -220,8 +220,8 @@ impl Rope {
 		Ok(())
 	}
 
-	pub fn flatten(&self) -> Result<(), Box<dyn Error>> {
-		self.root.write().map_err(|e| e.to_string())?.flatten();
+	pub fn flatten_inplace(&self) -> Result<(), Box<dyn Error>> {
+		self.root.write().map_err(|e| e.to_string())?.flatten_inplace();
 		Ok(())
 	}
 }
