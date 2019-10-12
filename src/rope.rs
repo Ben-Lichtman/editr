@@ -180,6 +180,25 @@ impl Node {
 			},
 		}
 	}
+
+	fn flatten(&mut self) {
+		if let Node::Internal(inner) = self {
+			inner.children.0.flatten();
+			inner.children.1.flatten();
+
+			match (&mut inner.children.0, &mut inner.children.1) {
+				(Node::Leaf(left), Node::Leaf(right)) => {
+					let mut saved_data_left = replace(&mut left.data, Vec::new());
+					let mut saved_data_right = replace(&mut right.data, Vec::new());
+					saved_data_left.append(&mut saved_data_right);
+					replace(self, Node::Leaf(LeafData {
+						data: saved_data_left,
+					}));
+				},
+				_ => panic!("Flatten Failed"),
+			}
+		}
+	}
 }
 
 impl Rope {
@@ -198,6 +217,11 @@ impl Rope {
 
 	pub fn remove_range(&self, from: usize, size: usize) -> Result<(), Box<dyn Error>> {
 		self.root.write().map_err(|e| e.to_string())?.remove_range(from, size);
+		Ok(())
+	}
+
+	pub fn flatten(&self) -> Result<(), Box<dyn Error>> {
+		self.root.write().map_err(|e| e.to_string())?.flatten();
 		Ok(())
 	}
 }
