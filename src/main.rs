@@ -1,7 +1,14 @@
 mod rope;
 
+use rope::Rope;
+
+fn print_rope(r: &Rope) {
+	let c = r.collect().unwrap();
+	println!("{:?}", std::str::from_utf8(&c).unwrap());
+}
+
 fn main() {
-	let r = rope::Rope::new();
+	let r = Rope::new();
 	// println!("{:#?}", r);
 
 	r.insert_at(0, "A".as_bytes()).unwrap();
@@ -22,6 +29,5 @@ fn main() {
 	// r.remove_range(0, 2).unwrap();
 	// println!("{:#?}", r);
 
-	let c = r.collect().unwrap();
-	println!("{:?}", std::str::from_utf8(&c).unwrap());
+	print_rope(&r);
 }
