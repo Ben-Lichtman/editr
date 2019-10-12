@@ -30,6 +30,27 @@ struct InternalData {
 	children: Box<(Node, Node)>,
 }
 
+struct LeafIter<'a> {
+	stack: Vec<&'a Node>,
+}
+
+impl<'a> Iterator for LeafIter<'a> {
+	type Item = &'a Node;
+
+	fn next(&mut self) -> Option<Self::Item> {
+		loop {
+			match self.stack.pop() {
+				Some(Node::Internal(inner)) => {
+					self.stack.push(&inner.children.1);
+					self.stack.push(&inner.children.0);
+				},
+				Some(x) => break Some(x),
+				None => break None,
+			}
+		}
+	}
+}
+
 impl Node {
 	fn size(&self) -> usize {
 		match self {
@@ -199,6 +220,12 @@ impl Node {
 			}
 		}
 	}
+
+	fn iterate_leaves(&self) -> LeafIter {
+		LeafIter {
+			stack: vec![self],
+		}
+	}
 }
 
 impl Rope {
@@ -220,8 +247,13 @@ impl Rope {
 		Ok(())
 	}
 
-	pub fn flatten_inplace(&self) -> Result<(), Box<dyn Error>> {
-		self.root.write().map_err(|e| e.to_string())?.flatten_inplace();
-		Ok(())
+	pub fn collect(&self) -> Result<Vec<u8>, Box<dyn Error>> {
+		let mut collection = Vec::new();
+		for node in self.root.read().map_err(|e| e.to_string())?.iterate_leaves() {
+			if let Node::Leaf(inner) = node {
+				collection.extend_from_slice(&inner.data);
+			}
+		}
+		Ok(collection)
 	}
 }
