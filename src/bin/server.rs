@@ -1,6 +1,4 @@
-mod rope;
-
-use rope::Rope;
+use editr::rope::Rope;
 
 fn print_rope(r: &Rope) {
 	let c = r.collect().unwrap();
