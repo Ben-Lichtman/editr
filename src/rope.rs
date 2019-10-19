@@ -44,7 +44,7 @@ impl<'a> Iterator for LeafIter<'a> {
 					self.stack.push(&inner.children.1);
 					self.stack.push(&inner.children.0);
 				},
-				Some(x) => break Some(x),
+				Some(leaf) => break Some(leaf),
 				None => break None,
 			}
 		}
@@ -247,11 +247,36 @@ impl Rope {
 		Ok(())
 	}
 
-	pub fn collect(&self) -> Result<Vec<u8>, Box<dyn Error>> {
-		let mut collection = Vec::new();
+	pub fn len(&self) -> Result<usize, Box<dyn Error>> {
+		let mut counter = 0usize;
 		for node in self.root.read().map_err(|e| e.to_string())?.iterate_leaves() {
 			if let Node::Leaf(inner) = node {
-				collection.extend_from_slice(&inner.data);
+				counter += inner.data.len();
+			}
+		}
+		Ok(counter)
+	}
+
+	pub fn collect(&self, from: usize, to: usize) -> Result<Vec<u8>, Box<dyn Error>> {
+		let mut collection = Vec::new();
+		let mut counter = 0usize;
+		for node in self.root.read().map_err(|e| e.to_string())?.iterate_leaves() {
+			if let Node::Leaf(inner) = node {
+				let len = inner.data.len();
+				let array_start = counter;
+				let array_end = counter + len;
+
+				if to <= array_start || array_end <= from {
+					counter += len;
+					continue
+				}
+
+				let slice_from = if array_start < from { from - array_start } else { 0 };
+				let slice_to = if to < array_end { to - array_start } else { len };
+
+				collection.extend_from_slice(&inner.data[slice_from..slice_to]);
+
+				counter += len;
 			}
 		}
 		Ok(collection)
