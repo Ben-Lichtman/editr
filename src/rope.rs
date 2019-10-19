@@ -281,4 +281,20 @@ impl Rope {
 		}
 		Ok(collection)
 	}
+
+	pub fn search(&self, needle: u8) -> Result<Vec<usize>, Box<dyn Error>> {
+		let mut matches = Vec::new();
+		let mut counter = 0usize;
+		for node in self.root.read().map_err(|e| e.to_string())?.iterate_leaves() {
+			if let Node::Leaf(inner) = node {
+				for byte in inner.data.iter() {
+					if *byte == needle {
+						matches.push(counter);
+					}
+					counter += 1;
+				}
+			}
+		}
+		Ok(matches)
+	}
 }
