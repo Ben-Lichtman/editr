@@ -1,19 +1,19 @@
-use std::error::Error;
-use std::path::{Path, PathBuf};
-use std::net::{ToSocketAddrs, TcpListener, TcpStream};
-use std::thread::spawn;
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::error::Error;
 use std::io::{BufReader, BufWriter, Read, Write};
+use std::net::{TcpListener, TcpStream, ToSocketAddrs};
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, RwLock};
+use std::thread::spawn;
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use serde_json;
 
 use crate::rope::Rope;
 
 const MAX_MESSAGE: usize = 1024;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize)]
 struct Message {
 	s: String,
 }
@@ -31,29 +31,37 @@ fn print_rope(r: &Rope, from: usize, to: usize) {
 }
 
 fn process_message(state: &mut ClientState, msg: Message) -> (Message, bool) {
-	(Message {
-		s: String::from("hello world"),
-	}, false)
+	(
+		Message {
+			s: String::from("hello world"),
+		},
+		false,
+	)
 }
 
 fn client_thread(mut state: ClientState) -> Result<(), Box<dyn Error>> {
 	let mut buffer = [0u8; MAX_MESSAGE];
 	loop {
 		let num_read = state.reader.read(&mut buffer)?;
-		if num_read == 0 { break }
+		if num_read == 0 {
+			break;
+		}
 		let msg: Message = serde_json::from_slice(&buffer[..num_read])?;
 		let (response, exit) = process_message(&mut state, msg);
 		let response_raw = serde_json::to_vec(&response)?;
 		let num_written = state.writer.write(&response_raw)?;
-		if num_written == 0 { break }
+		if num_written == 0 {
+			break;
+		}
 		state.writer.flush()?;
-		if exit { break }
+		if exit {
+			break;
+		}
 	}
 	Ok(())
 }
 
 pub fn start<A: ToSocketAddrs>(path: &Path, address: A) -> Result<(), Box<dyn Error>> {
-
 	let canonical_home = path.canonicalize()?;
 
 	let listener = TcpListener::bind(address)?;
@@ -76,7 +84,7 @@ pub fn start<A: ToSocketAddrs>(path: &Path, address: A) -> Result<(), Box<dyn Er
 			};
 			client_thread(state).ok();
 		});
-    }
+	}
 
 	Ok(())
 }

@@ -19,8 +19,8 @@ struct LeafData {
 
 impl std::fmt::Debug for LeafData {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", std::str::from_utf8(&self.data).unwrap())
-    }
+		write!(f, "{:?}", std::str::from_utf8(&self.data).unwrap())
+	}
 }
 
 #[derive(Debug)]
@@ -43,7 +43,7 @@ impl<'a> Iterator for LeafIter<'a> {
 				Some(Node::Internal(inner)) => {
 					self.stack.push(&inner.children.1);
 					self.stack.push(&inner.children.0);
-				},
+				}
 				Some(leaf) => break Some(leaf),
 				None => break None,
 			}
@@ -88,13 +88,16 @@ impl Node {
 					replace(self, left_node);
 				}
 				else {
-					replace(self, Node::Internal(InternalData {
-						index: left_node.size(),
-						size: left_node.size() + right_node.size(),
-						children: Box::new((left_node, right_node)),
-					}));
+					replace(
+						self,
+						Node::Internal(InternalData {
+							index: left_node.size(),
+							size: left_node.size() + right_node.size(),
+							children: Box::new((left_node, right_node)),
+						}),
+					);
 				}
-			},
+			}
 			Node::Internal(inner) => {
 				if index <= inner.index {
 					inner.children.0.insert_at(index, input);
@@ -104,7 +107,7 @@ impl Node {
 				}
 				inner.index = inner.children.0.size();
 				inner.size = inner.children.0.size() + inner.children.1.size();
-			},
+			}
 		}
 	}
 
@@ -131,13 +134,16 @@ impl Node {
 					replace(self, left_node);
 				}
 				else {
-					replace(self, Node::Internal(InternalData {
-						index: left_node.size(),
-						size: left_node.size() + right_node.size(),
-						children: Box::new((left_node, right_node)),
-					}));
+					replace(
+						self,
+						Node::Internal(InternalData {
+							index: left_node.size(),
+							size: left_node.size() + right_node.size(),
+							children: Box::new((left_node, right_node)),
+						}),
+					);
 				}
-			},
+			}
 			Node::Internal(inner) => {
 				let l_from = inner.index.min(from);
 				let l_to = inner.index.min(to);
@@ -154,57 +160,57 @@ impl Node {
 					match right_node {
 						Node::Leaf(child_inner) => {
 							let saved_data = replace(&mut child_inner.data, Vec::new());
-							replace(self, Node::Leaf(LeafData {
-								data: saved_data,
-							}));
-						},
+							replace(self, Node::Leaf(LeafData { data: saved_data }));
+						}
 						Node::Internal(child_inner) => {
-							let saved_box = replace(&mut child_inner.children, Box::new((
-									Node::Leaf(LeafData {
-										data: Vec::new(),
-									}),
-									Node::Leaf(LeafData {
-										data: Vec::new(),
-									}),
-								)));
-							replace(self, Node::Internal(InternalData {
-								index: saved_box.0.size(),
-								size: saved_box.0.size() + saved_box.1.size(),
-								children: saved_box,
-							}));
-						},
+							let saved_box = replace(
+								&mut child_inner.children,
+								Box::new((
+									Node::Leaf(LeafData { data: Vec::new() }),
+									Node::Leaf(LeafData { data: Vec::new() }),
+								)),
+							);
+							replace(
+								self,
+								Node::Internal(InternalData {
+									index: saved_box.0.size(),
+									size: saved_box.0.size() + saved_box.1.size(),
+									children: saved_box,
+								}),
+							);
+						}
 					}
 				}
 				else if right_node.size() == 0 {
 					match left_node {
 						Node::Leaf(child_inner) => {
 							let saved_data = replace(&mut child_inner.data, Vec::new());
-							replace(self, Node::Leaf(LeafData {
-								data: saved_data,
-							}));
-						},
+							replace(self, Node::Leaf(LeafData { data: saved_data }));
+						}
 						Node::Internal(child_inner) => {
-							let saved_box = replace(&mut child_inner.children, Box::new((
-									Node::Leaf(LeafData {
-										data: Vec::new(),
-									}),
-									Node::Leaf(LeafData {
-										data: Vec::new(),
-									}),
-								)));
-							replace(self, Node::Internal(InternalData {
-								index: saved_box.0.size(),
-								size: saved_box.0.size() + saved_box.1.size(),
-								children: saved_box,
-							}));
-						},
+							let saved_box = replace(
+								&mut child_inner.children,
+								Box::new((
+									Node::Leaf(LeafData { data: Vec::new() }),
+									Node::Leaf(LeafData { data: Vec::new() }),
+								)),
+							);
+							replace(
+								self,
+								Node::Internal(InternalData {
+									index: saved_box.0.size(),
+									size: saved_box.0.size() + saved_box.1.size(),
+									children: saved_box,
+								}),
+							);
+						}
 					}
 				}
 				else {
 					inner.index = inner.children.0.size();
 					inner.size = inner.children.0.size() + inner.children.1.size();
 				}
-			},
+			}
 		}
 	}
 
@@ -218,38 +224,43 @@ impl Node {
 					let mut saved_data_left = replace(&mut left.data, Vec::new());
 					let mut saved_data_right = replace(&mut right.data, Vec::new());
 					saved_data_left.append(&mut saved_data_right);
-					replace(self, Node::Leaf(LeafData {
-						data: saved_data_left,
-					}));
-				},
+					replace(
+						self,
+						Node::Leaf(LeafData {
+							data: saved_data_left,
+						}),
+					);
+				}
 				_ => panic!("Flatten Failed"),
 			}
 		}
 	}
 
 	fn iterate_leaves(&self) -> LeafIter {
-		LeafIter {
-			stack: vec![self],
-		}
+		LeafIter { stack: vec![self] }
 	}
 }
 
 impl Rope {
 	pub fn new() -> Rope {
 		Rope {
-			root: Arc::new(RwLock::new(Node::Leaf(LeafData {
-				data: Vec::new(),
-			}))),
+			root: Arc::new(RwLock::new(Node::Leaf(LeafData { data: Vec::new() }))),
 		}
 	}
 
 	pub fn insert_at(&self, index: usize, input: &[u8]) -> Result<(), Box<dyn Error>> {
-		self.root.write().map_err(|e| e.to_string())?.insert_at(index, input);
+		self.root
+			.write()
+			.map_err(|e| e.to_string())?
+			.insert_at(index, input);
 		Ok(())
 	}
 
 	pub fn remove_range(&self, from: usize, size: usize) -> Result<(), Box<dyn Error>> {
-		self.root.write().map_err(|e| e.to_string())?.remove_range(from, size);
+		self.root
+			.write()
+			.map_err(|e| e.to_string())?
+			.remove_range(from, size);
 		Ok(())
 	}
 
@@ -264,7 +275,12 @@ impl Rope {
 	pub fn collect(&self, from: usize, to: usize) -> Result<Vec<u8>, Box<dyn Error>> {
 		let mut collection = Vec::new();
 		let mut counter = 0usize;
-		for node in self.root.read().map_err(|e| e.to_string())?.iterate_leaves() {
+		for node in self
+			.root
+			.read()
+			.map_err(|e| e.to_string())?
+			.iterate_leaves()
+		{
 			if let Node::Leaf(inner) = node {
 				let len = inner.data.len();
 				let array_start = counter;
@@ -272,11 +288,21 @@ impl Rope {
 
 				if to <= array_start || array_end <= from {
 					counter += len;
-					continue
+					continue;
 				}
 
-				let slice_from = if array_start < from { from - array_start } else { 0 };
-				let slice_to = if to < array_end { to - array_start } else { len };
+				let slice_from = if array_start < from {
+					from - array_start
+				}
+				else {
+					0
+				};
+				let slice_to = if to < array_end {
+					to - array_start
+				}
+				else {
+					len
+				};
 
 				collection.extend_from_slice(&inner.data[slice_from..slice_to]);
 
@@ -289,7 +315,12 @@ impl Rope {
 	pub fn search(&self, needle: u8) -> Result<Vec<usize>, Box<dyn Error>> {
 		let mut matches = Vec::new();
 		let mut counter = 0usize;
-		for node in self.root.read().map_err(|e| e.to_string())?.iterate_leaves() {
+		for node in self
+			.root
+			.read()
+			.map_err(|e| e.to_string())?
+			.iterate_leaves()
+		{
 			if let Node::Leaf(inner) = node {
 				for byte in inner.data.iter() {
 					if *byte == needle {
