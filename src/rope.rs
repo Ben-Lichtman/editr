@@ -51,6 +51,12 @@ impl<'a> Iterator for LeafIter<'a> {
 	}
 }
 
+impl Default for Rope {
+	fn default() -> Self {
+		Self::new()
+	}
+}
+
 impl Node {
 	fn size(&self) -> usize {
 		match self {
@@ -59,13 +65,13 @@ impl Node {
 		}
 	}
 
-	fn insert_at(&mut self, index: usize, mut input: &[u8]) {
+	fn insert_at(&mut self, index: usize, input: &[u8]) {
 		match self {
 			Node::Leaf(inner) => {
 				let mut left_node_data = replace(&mut inner.data, Vec::new());
 				let right_node_data = left_node_data.split_off(index);
 
-				left_node_data.extend_from_slice(&mut input);
+				left_node_data.extend_from_slice(&input);
 
 				let left_node = Node::Leaf(LeafData {
 					data: left_node_data,
@@ -248,13 +254,11 @@ impl Rope {
 	}
 
 	pub fn len(&self) -> Result<usize, Box<dyn Error>> {
-		let mut counter = 0usize;
-		for node in self.root.read().map_err(|e| e.to_string())?.iterate_leaves() {
-			if let Node::Leaf(inner) = node {
-				counter += inner.data.len();
-			}
-		}
-		Ok(counter)
+		Ok(self.root.read().map_err(|e| e.to_string())?.size())
+	}
+
+	pub fn is_empty(&self) -> Result<bool, Box<dyn Error>> {
+		Ok(self.len()? == 0)
 	}
 
 	pub fn collect(&self, from: usize, to: usize) -> Result<Vec<u8>, Box<dyn Error>> {
