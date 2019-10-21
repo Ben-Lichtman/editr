@@ -47,7 +47,7 @@ fn client_thread(mut state: ClientState) -> Result<(), Box<dyn Error>> {
 		let num_written = state.writer.write(&response_raw)?;
 		if num_written == 0 { break }
 		state.writer.flush()?;
-		if exit == true { break }
+		if exit { break }
 	}
 	Ok(())
 }
@@ -71,8 +71,8 @@ pub fn start<A: ToSocketAddrs>(path: &Path, address: A) -> Result<(), Box<dyn Er
 			let state = ClientState {
 				reader: BufReader::new(&stream),
 				writer: BufWriter::new(&stream),
-				canonical_home: canonical_home,
-				files: files,
+				canonical_home,
+				files,
 			};
 			client_thread(state).ok();
 		});
