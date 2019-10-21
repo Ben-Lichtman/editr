@@ -66,7 +66,7 @@ pub fn start<A: ToSocketAddrs>(path: &Path, address: A) -> Result<(), Box<dyn Er
 		spawn(move || {
 			let stream = match stream_result {
 				Ok(s) => s,
-				_ => return,
+				Err(_) => return,
 			};
 			let state = ClientState {
 				reader: BufReader::new(&stream),
