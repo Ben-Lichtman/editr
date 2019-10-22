@@ -17,6 +17,7 @@ struct LeafData {
 	data: Vec<u8>,
 }
 
+// Make it more friendly to print leaves as debug - turn it to readable characters
 impl std::fmt::Debug for LeafData {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		write!(f, "{:?}", std::str::from_utf8(&self.data).unwrap())
@@ -30,6 +31,8 @@ struct InternalData {
 	children: Box<(Node, Node)>,
 }
 
+// This will yield a leaf Vec for each call of next()
+// Maintains an internal stack for a depth first search
 struct LeafIter<'a> {
 	stack: Vec<&'a Node>,
 }
@@ -52,9 +55,7 @@ impl<'a> Iterator for LeafIter<'a> {
 }
 
 impl Default for Rope {
-	fn default() -> Self {
-		Self::new()
-	}
+	fn default() -> Self { Self::new() }
 }
 
 impl Node {
@@ -68,11 +69,16 @@ impl Node {
 	fn insert_at(&mut self, index: usize, input: &[u8]) {
 		match self {
 			Node::Leaf(inner) => {
+				// Move Vec out of the node
 				let mut left_node_data = replace(&mut inner.data, Vec::new());
+
+				// Split into 2 - clone is performed here
 				let right_node_data = left_node_data.split_off(index);
 
+				// Clone our slice to the end of the left node data
 				left_node_data.extend_from_slice(&input);
 
+				// Create the new node structures and move our new Vecs inside
 				let left_node = Node::Leaf(LeafData {
 					data: left_node_data,
 				});
@@ -81,12 +87,14 @@ impl Node {
 					data: right_node_data,
 				});
 
+				// If a node is empty, use only the other one
 				if left_node.size() == 0 {
 					replace(self, right_node);
 				}
 				else if right_node.size() == 0 {
 					replace(self, left_node);
 				}
+				// If both nodes have data use an Internal parent node
 				else {
 					replace(
 						self,
@@ -98,6 +106,7 @@ impl Node {
 					);
 				}
 			}
+			// Recurse deeper
 			Node::Internal(inner) => {
 				if index <= inner.index {
 					inner.children.0.insert_at(index, input);
@@ -105,6 +114,7 @@ impl Node {
 				else {
 					inner.children.1.insert_at(index - inner.index, input);
 				}
+				// Update node sizes
 				inner.index = inner.children.0.size();
 				inner.size = inner.children.0.size() + inner.children.1.size();
 			}
@@ -114,11 +124,15 @@ impl Node {
 	fn remove_range(&mut self, from: usize, to: usize) {
 		match self {
 			Node::Leaf(inner) => {
+				// Move Vec out of the node
 				let mut left_node_data = replace(&mut inner.data, Vec::new());
+				// Split into 2 - clone is performed here
 				let right_node_data = left_node_data.split_off(to);
 
+				// Truncate left node data
 				left_node_data.truncate(from);
 
+				// Create new node structures and move our new Vecs inside
 				let left_node = Node::Leaf(LeafData {
 					data: left_node_data,
 				});
@@ -127,12 +141,14 @@ impl Node {
 					data: right_node_data,
 				});
 
+				// If a node is empty, use only the other one
 				if left_node.size() == 0 {
 					replace(self, right_node);
 				}
 				else if right_node.size() == 0 {
 					replace(self, left_node);
 				}
+				// If both nodes have data use an Internal parent node
 				else {
 					replace(
 						self,
@@ -145,6 +161,7 @@ impl Node {
 				}
 			}
 			Node::Internal(inner) => {
+				// Calculate parameters for children
 				let l_from = inner.index.min(from);
 				let l_to = inner.index.min(to);
 				let r_from = inner.index.max(from) - inner.index;
@@ -153,9 +170,11 @@ impl Node {
 				let left_node = &mut inner.children.0;
 				let right_node = &mut inner.children.1;
 
+				// Recurse deeper
 				left_node.remove_range(l_from, l_to);
 				right_node.remove_range(r_from, r_to);
 
+				// Check for empty children and replace self with nonempty child
 				if left_node.size() == 0 {
 					match right_node {
 						Node::Leaf(child_inner) => {
@@ -206,6 +225,7 @@ impl Node {
 						}
 					}
 				}
+				// Otherwise update sizes
 				else {
 					inner.index = inner.children.0.size();
 					inner.size = inner.children.0.size() + inner.children.1.size();
@@ -216,9 +236,11 @@ impl Node {
 
 	fn flatten(&mut self) {
 		if let Node::Internal(inner) = self {
+			// Recurse deeper
 			inner.children.0.flatten();
 			inner.children.1.flatten();
 
+			// Replace self with leaf node containing both child leaf nodes concatenated
 			match (&mut inner.children.0, &mut inner.children.1) {
 				(Node::Leaf(left), Node::Leaf(right)) => {
 					let mut saved_data_left = replace(&mut left.data, Vec::new());
@@ -236,9 +258,7 @@ impl Node {
 		}
 	}
 
-	fn iterate_leaves(&self) -> LeafIter {
-		LeafIter { stack: vec![self] }
-	}
+	fn iterate_leaves(&self) -> LeafIter { LeafIter { stack: vec![self] } }
 }
 
 impl Rope {
@@ -268,13 +288,12 @@ impl Rope {
 		Ok(self.root.read().map_err(|e| e.to_string())?.size())
 	}
 
-	pub fn is_empty(&self) -> Result<bool, Box<dyn Error>> {
-		Ok(self.len()? == 0)
-	}
+	pub fn is_empty(&self) -> Result<bool, Box<dyn Error>> { Ok(self.len()? == 0) }
 
 	pub fn collect(&self, from: usize, to: usize) -> Result<Vec<u8>, Box<dyn Error>> {
 		let mut collection = Vec::new();
 		let mut counter = 0usize;
+
 		for node in self
 			.root
 			.read()
@@ -287,10 +306,14 @@ impl Rope {
 				let array_end = counter + len;
 
 				if to <= array_start || array_end <= from {
+					// Requested bytes not in current array
 					counter += len;
 					continue;
 				}
 
+				// Requested bytes are in current array
+
+				// Set bounds to slice current array
 				let slice_from = if array_start < from {
 					from - array_start
 				}
@@ -304,6 +327,7 @@ impl Rope {
 					len
 				};
 
+				// Append slice to collected bytes
 				collection.extend_from_slice(&inner.data[slice_from..slice_to]);
 
 				counter += len;
