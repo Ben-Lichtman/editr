@@ -14,8 +14,27 @@ use crate::rope::Rope;
 const MAX_MESSAGE: usize = 1024;
 
 #[derive(Serialize, Deserialize)]
-struct Message {
-	s: String,
+struct WriteReqData {
+	offset: usize,
+	data: Vec<u8>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct ReadReqData {
+	offset: usize,
+	len: usize,
+}
+
+#[derive(Serialize, Deserialize)]
+enum Message {
+	None,
+	Echo(Vec<u8>),
+	OpenReq(String),
+	OpenResp,
+	WriteReq(WriteReqData),
+	WriteResp,
+	ReadReq(ReadReqData),
+	ReadResp(Vec<u8>),
 }
 
 struct ClientState<'a> {
@@ -25,24 +44,35 @@ struct ClientState<'a> {
 	files: Arc<RwLock<HashMap<PathBuf, Rope>>>,
 }
 
-fn print_rope(r: &Rope, from: usize, to: usize) {
-	let c = r.collect(from, to).unwrap();
-	println!("{:?}", std::str::from_utf8(&c).unwrap());
-}
-
+// Takes a message and the current client's state, processes it, and returns a message to reply with
 fn process_message(state: &mut ClientState, msg: Message) -> (Message, bool) {
-	(
-		Message {
-			s: String::from("hello world"),
-		},
-		false,
-	)
+	match msg {
+		Message::None => (Message::None, false),
+		Message::Echo(inner) => (Message::Echo(inner), false),
+		Message::OpenReq(inner) => {
+			// TODO Do open
+			(Message::OpenResp, false)
+		}
+		Message::WriteReq(inner) => {
+			// TODO Do write
+			(Message::WriteResp, false)
+		}
+		Message::ReadReq(inner) => {
+			// TODO Do read
+			let resp_data = Vec::new();
+			(Message::ReadResp(resp_data), false)
+		}
+		_ => (Message::None, false),
+	}
 }
 
+// The main function run by the client thread
 fn client_thread(mut state: ClientState) -> Result<(), Box<dyn Error>> {
 	let mut buffer = [0u8; MAX_MESSAGE];
 	loop {
 		let num_read = state.reader.read(&mut buffer)?;
+
+		// Check for a EOF
 		if num_read == 0 {
 			break;
 		}
@@ -50,10 +80,13 @@ fn client_thread(mut state: ClientState) -> Result<(), Box<dyn Error>> {
 		let (response, exit) = process_message(&mut state, msg);
 		let response_raw = serde_json::to_vec(&response)?;
 		let num_written = state.writer.write(&response_raw)?;
+
+		// Check for a EOF
 		if num_written == 0 {
 			break;
 		}
 		state.writer.flush()?;
+		// Client has finished connection
 		if exit {
 			break;
 		}
