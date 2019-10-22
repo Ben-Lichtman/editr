@@ -27,7 +27,7 @@ struct ReadReqData {
 
 #[derive(Serialize, Deserialize)]
 enum Message {
-	None,
+	Invalid,
 	Echo(Vec<u8>),
 	OpenReq(String),
 	OpenResp,
@@ -47,7 +47,6 @@ struct ClientState<'a> {
 // Takes a message and the current client's state, processes it, and returns a message to reply with
 fn process_message(state: &mut ClientState, msg: Message) -> (Message, bool) {
 	match msg {
-		Message::None => (Message::None, false),
 		Message::Echo(inner) => (Message::Echo(inner), false),
 		Message::OpenReq(inner) => {
 			// TODO Do open
@@ -62,7 +61,7 @@ fn process_message(state: &mut ClientState, msg: Message) -> (Message, bool) {
 			let resp_data = Vec::new();
 			(Message::ReadResp(resp_data), false)
 		}
-		_ => (Message::None, false),
+		_ => (Message::Invalid, false),
 	}
 }
 
