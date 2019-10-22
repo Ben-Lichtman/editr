@@ -85,8 +85,8 @@ fn client_thread(mut state: ClientState) -> Result<(), Box<dyn Error>> {
 			break;
 		}
 		state.writer.flush()?;
-		// Client has finished connection
 		if exit {
+			// Client has finished connection
 			break;
 		}
 	}
