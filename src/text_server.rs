@@ -38,12 +38,16 @@ enum Message {
 	ReadResp(Vec<u8>),
 }
 
+struct FileState {
+	rope: Rope,
+}
+
 struct ClientState<'a> {
 	reader: BufReader<&'a TcpStream>,
 	writer: BufWriter<&'a TcpStream>,
 	canonical_home: PathBuf,
-	files: Arc<RwLock<HashMap<PathBuf, Rope>>>,
 	path: Option<PathBuf>,
+	files: Arc<RwLock<HashMap<PathBuf, FileState>>>,
 }
 
 // Takes a message and the current client's state, processes it, and returns a message to reply with
@@ -89,7 +93,7 @@ fn open_file(state: &mut ClientState, path: &str) -> Result<(), Box<dyn error::E
 
 			let new_rope = Rope::new();
 			new_rope.insert_at(0, buffer.as_slice())?;
-			ropes.insert(path.clone(), new_rope);
+			ropes.insert(path.clone(), FileState { rope: new_rope });
 			state.path = Some(path);
 		}
 	}
@@ -140,7 +144,7 @@ pub fn start<A: ToSocketAddrs>(path: &Path, address: A) -> Result<(), Box<dyn er
 
 	let listener = TcpListener::bind(address)?;
 
-	let files: Arc<RwLock<HashMap<PathBuf, Rope>>> = Arc::new(RwLock::new(HashMap::new()));
+	let files: Arc<RwLock<HashMap<PathBuf, FileState>>> = Arc::new(RwLock::new(HashMap::new()));
 
 	for stream_result in listener.incoming() {
 		let canonical_home = canonical_home.clone();
