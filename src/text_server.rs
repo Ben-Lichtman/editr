@@ -37,11 +37,15 @@ enum Message {
 	ReadResp(Vec<u8>),
 }
 
+struct FileState {
+	rope: Rope,
+}
+
 struct ClientState<'a> {
 	reader: BufReader<&'a TcpStream>,
 	writer: BufWriter<&'a TcpStream>,
 	canonical_home: PathBuf,
-	files: Arc<RwLock<HashMap<PathBuf, Rope>>>,
+	files: Arc<RwLock<HashMap<PathBuf, FileState>>>,
 }
 
 // Takes a message and the current client's state, processes it, and returns a message to reply with
@@ -98,7 +102,7 @@ pub fn start<A: ToSocketAddrs>(path: &Path, address: A) -> Result<(), Box<dyn Er
 
 	let listener = TcpListener::bind(address)?;
 
-	let files: Arc<RwLock<HashMap<PathBuf, Rope>>> = Arc::new(RwLock::new(HashMap::new()));
+	let files: Arc<RwLock<HashMap<PathBuf, FileState>>> = Arc::new(RwLock::new(HashMap::new()));
 
 	for stream_result in listener.incoming() {
 		let canonical_home = canonical_home.clone();
