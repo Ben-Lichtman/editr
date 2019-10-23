@@ -78,8 +78,10 @@ fn process_message(state: &mut ClientState, msg: Message) -> (Message, bool) {
 fn open_file(state: &mut ClientState, path: &str) -> Result<(), Box<dyn error::Error>> {
 	let path = Path::new(&path);
 	if !is_valid_path(path) {
-		return Err("Path out of bounds".into());
-	//return io::Error::new(ErrorKind::PermissionDenied, "Path is out of bounds");
+		return Err(Box::new(io::Error::new(
+			ErrorKind::PermissionDenied,
+			"Path is out of bounds",
+		)));
 	}
 	else {
 		// Acquire write lock on state.files
