@@ -65,7 +65,7 @@ fn open_file(thread_local: &mut ThreadState, path: &str) -> Result<PathBuf, Box<
 
 	// Check that path is valid given client home
 	if !canonical_path.starts_with(&thread_local.canonical_home) {
-		Err("Invalid file path")?
+		return Err("Invalid file path".into());
 	}
 
 	// Make sure the files hashmap contains this file
@@ -82,7 +82,7 @@ fn open_file(thread_local: &mut ThreadState, path: &str) -> Result<PathBuf, Box<
 
 		// Add to rope
 		let rope = Rope::new();
-		rope.insert_at(0, &buffer);
+		rope.insert_at(0, &buffer)?;
 
 		thread_local
 			.files
