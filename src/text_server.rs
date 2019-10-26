@@ -117,6 +117,7 @@ fn process_message(thread_local: &mut ThreadState, msg: Message) -> (Message, bo
 	match msg {
 		Message::Echo(inner) => (Message::Echo(inner), false),
 		Message::OpenReq(inner) => match open_file(thread_local, &inner) {
+			// TODO Multithreading: Add new clients here, update the ThreadState's files & 
 			Ok(_) => (Message::OpenResp(true), false),
 			Err(_) => (Message::OpenResp(false), false),
 		},
@@ -129,9 +130,24 @@ fn process_message(thread_local: &mut ThreadState, msg: Message) -> (Message, bo
 			let resp_data = Vec::new();
 			(Message::ReadResp(resp_data), false)
 		}
+		Message::SaveReq(inner) => {
+			// Flatten the rope & save the file
+			// Current assumption is that client will have the most up-to-date version and is happy with
+			// having that version being written to file
+			// TODO Multithreading: Consider the client not having the most updated file, thus saving the altered view from another client.
+			// Current flow: Receive the message
+			//				 Acquire lock for the filestate
+			// 				 Flatten the rope
+			//  		 	 Release the lock for the filestate
+
+
+
+		}
 		_ => (Message::Invalid, false),
 	}
 }
+
+
 
 // The main function run by the client thread
 fn client_thread(thread_local: &mut ThreadState) -> Result<(), Box<dyn Error>> {
