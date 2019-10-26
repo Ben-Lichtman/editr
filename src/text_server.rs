@@ -7,170 +7,19 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, RwLock};
 use std::thread::{current, spawn, ThreadId};
 
-use serde::{Deserialize, Serialize};
 use serde_json;
 
+use crate::message::{process_message, Message};
 use crate::rope::Rope;
+use crate::state::{FileState, ThreadShared, ThreadState};
 
 const MAX_MESSAGE: usize = 1024;
-
-#[derive(Serialize, Deserialize)]
-struct WriteReqData {
-	offset: usize,
-	data: Vec<u8>,
-}
-
-#[derive(Serialize, Deserialize)]
-struct ReadReqData {
-	offset: usize,
-	len: usize,
-}
-
-#[derive(Serialize, Deserialize)]
-enum Message {
-	Invalid,
-	Echo(Vec<u8>),
-	OpenReq(String),
-	OpenResp(bool),
-	WriteReq(WriteReqData),
-	WriteResp,
-	ReadReq(ReadReqData),
-	ReadResp(Vec<u8>),
-	SaveReq,
-}
-
-struct FileState {
-	rope: Rope,
-	clients: HashSet<ThreadId>,
-}
-
-struct ThreadShared {
-	reader: BufReader<TcpStream>,
-	writer: BufWriter<TcpStream>,
-}
-
-struct ThreadState {
-	thread_id: ThreadId,
-	thread_shared: Arc<RwLock<HashMap<ThreadId, Mutex<ThreadShared>>>>,
-	files: Arc<RwLock<HashMap<PathBuf, FileState>>>,
-	canonical_home: PathBuf,
-	current_file_loc: Option<PathBuf>,
-}
-
-fn open_file(thread_local: &mut ThreadState, path: &str) -> Result<PathBuf, Box<dyn Error>> {
-	// TODO Remove self from bookkeeping of a file already opened
-	// TODO possibly close file that was already opened
-	let path = Path::new(path);
-
-	let canonical_path = path.canonicalize()?;
-
-	// Check that path is valid given client home
-	if !canonical_path.starts_with(&thread_local.canonical_home) {
-		return Err("Invalid file path".into());
-	}
-
-	// Make sure the files hashmap contains this file
-	if !thread_local
-		.files
-		.read()
-		.or(Err("Could not read lock file map"))?
-		.contains_key(&canonical_path)
-	{
-		// Read file
-		let mut buffer = Vec::new();
-		let mut file = File::open(&canonical_path)?;
-		file.read_to_end(&mut buffer)?;
-
-		// Add to rope
-		let rope = Rope::new();
-		rope.insert_at(0, &buffer)?;
-
-		thread_local
-			.files
-			.write()
-			.or(Err("Could not write lock file map"))?
-			.insert(
-				canonical_path.clone(),
-				FileState {
-					rope,
-					clients: HashSet::new(),
-				},
-			);
-	}
-
-	// Add bookkeeping
-	thread_local
-		.files
-		.write()
-		.or(Err("Could not write lock file map"))?
-		.get_mut(&canonical_path)
-		.ok_or("Thread local storage does not exist")?
-		.clients
-		.insert(thread_local.thread_id);
-
-	thread_local.current_file_loc = Some(canonical_path.clone());
-
-	Ok(canonical_path)
-}
-
-// Takes a message and the current client's state, processes it, and returns a message to reply with
-fn process_message(thread_local: &mut ThreadState, msg: Message) -> (Message, bool) {
-	match msg {
-		Message::Echo(inner) => (Message::Echo(inner), false),
-		Message::OpenReq(inner) => match open_file(thread_local, &inner) {
-			// TODO Multithreading: Add new clients here, update the ThreadState's files & 
-			Ok(_) => (Message::OpenResp(true), false),
-			Err(_) => (Message::OpenResp(false), false),
-		},
-		Message::WriteReq(inner) => {
-			// TODO Do write
-			(Message::WriteResp, false)
-		}
-		Message::ReadReq(inner) => {
-			// TODO Do read
-			let resp_data = Vec::new();
-			(Message::ReadResp(resp_data), false)
-		}
-		Message::SaveReq(inner) => {
-			// Flatten the rope & save the file
-			// Current assumption is that client will have the most up-to-date version and is happy with
-			// having that version being written to file
-			// TODO Multithreading: Consider the client not having the most updated file, thus saving the altered view from another client.
-			// Current flow: Receive the message
-			//				 Acquire lock for the filestate
-			// 				 Flatten the rope
-			//  		 	 Release the lock for the filestate
-
-
-
-		}
-		_ => (Message::Invalid, false),
-	}
-}
-
-// Function to handle the save request made by a thread
-// fn handle_save(thread_local: &mut ThreadState, _msg: Message) -> Result<(), Box<dyn Error>> {
-// 	thread_local
-// 		.files
-// 		.read()
-// 		.
-// 	OK(())
-// }
 
 // The main function run by the client thread
 fn client_thread(thread_local: &mut ThreadState) -> Result<(), Box<dyn Error>> {
 	let mut buffer = [0u8; MAX_MESSAGE];
 	loop {
-		let num_read = thread_local
-			.thread_shared
-			.read()
-			.or(Err("Could not get read lock"))?
-			.get(&thread_local.thread_id)
-			.ok_or("Thread local storage does not exist")?
-			.lock()
-			.or(Err("Unable to lock thread shared data"))?
-			.reader
-			.read(&mut buffer)?;
+		let num_read = thread_local.read(&mut buffer)?;
 
 		// Check for a EOF
 		if num_read == 0 {
@@ -183,16 +32,7 @@ fn client_thread(thread_local: &mut ThreadState) -> Result<(), Box<dyn Error>> {
 
 		let response_raw = serde_json::to_vec(&response)?;
 
-		let num_written = thread_local
-			.thread_shared
-			.read()
-			.or(Err("Could not get read lock"))?
-			.get(&thread_local.thread_id)
-			.ok_or("Thread local storage does not exist")?
-			.lock()
-			.or(Err("Unable to lock thread shared data"))?
-			.writer
-			.write(&response_raw)?;
+		let num_written = thread_local.write(&response_raw)?;
 
 		// Check for a EOF
 		if num_written == 0 {
@@ -234,30 +74,13 @@ pub fn start<A: ToSocketAddrs>(path: &Path, address: A) -> Result<(), Box<dyn Er
 		spawn(move || {
 			let stream = stream_result.unwrap();
 
-			let mut thread_local = ThreadState {
-				thread_id: current().id(),
-				thread_shared,
-				files,
-				canonical_home,
-				current_file_loc: None,
-			};
+			let mut thread_local = ThreadState::new(thread_shared, files, canonical_home);
 
-			thread_local.thread_shared.write().unwrap().insert(
-				thread_local.thread_id,
-				Mutex::new(ThreadShared {
-					reader: BufReader::new(stream.try_clone().unwrap()),
-					// writer: BufWriter::new(stream.try_clone().unwrap()),
-					writer: BufWriter::with_capacity(0, stream.try_clone().unwrap()),
-				}),
-			);
+			thread_local.insert_thread_shared(stream);
 
 			client_thread(&mut thread_local).unwrap();
 
-			thread_local
-				.thread_shared
-				.write()
-				.unwrap()
-				.remove(&thread_local.thread_id);
+			thread_local.remove_thread_shared();
 		});
 	}
 
