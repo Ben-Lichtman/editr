@@ -27,6 +27,12 @@ struct ReadReqData {
 }
 
 #[derive(Serialize, Deserialize)]
+struct ReadRespData {
+    data: Vec<u8>,
+    error: String,
+}
+
+#[derive(Serialize, Deserialize)]
 enum Message {
 	Invalid,
 	Echo(Vec<u8>),
@@ -35,7 +41,7 @@ enum Message {
 	WriteReq(WriteReqData),
 	WriteResp,
 	ReadReq(ReadReqData),
-	ReadResp(Vec<u8>),
+    ReadResp(ReadRespData),
 }
 
 struct FileState {
@@ -112,6 +118,18 @@ fn open_file(thread_local: &mut ThreadState, path: &str) -> Result<PathBuf, Box<
 	Ok(canonical_path)
 }
 
+// Returns part of a file, starting from 'from' and ending at
+// 'to', where 'from' and 'to' are byte offsets.
+fn read_file(thread_local: &ThreadState, from: usize, to: usize) -> Result<Vec<u8>, Box<dyn Error>> {
+
+    let file_loc = thread_local.current_file_loc.ok_or("File path not given")?;
+    let read_rope = thread_local
+       .files.read().or(Err("Could not read lock file map"))?
+       .get(&file_loc).ok_or("File doesn't exist")?
+       .rope;
+    let read_part = read_rope.collect(from, to)?
+}
+
 // Takes a message and the current client's state, processes it, and returns a message to reply with
 fn process_message(thread_local: &mut ThreadState, msg: Message) -> (Message, bool) {
 	match msg {
@@ -126,8 +144,16 @@ fn process_message(thread_local: &mut ThreadState, msg: Message) -> (Message, bo
 		}
 		Message::ReadReq(inner) => {
 			// TODO Do read
-			let resp_data = Vec::new();
-			(Message::ReadResp(resp_data), false)
+            let read_from = inner.offset;
+            let read_to = inner.offset + inner.len - 1;
+            match read_file(thread_local, read_from, read_to) {
+                Ok(data) => (Message::ReadResp(
+                        ReadRespData{ data, error: "" }),
+                        false),
+                Err(error) => (Message::ReadResp(
+                        ReadRespData{ data: Vec::new(), error }, false),
+            }
+
 		}
 		_ => (Message::Invalid, false),
 	}
