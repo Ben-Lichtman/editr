@@ -71,11 +71,26 @@ fn open_file(thread_local: &mut ThreadState, path: &str) -> Result<PathBuf, Box<
 	Ok(canonical_path)
 }
 
+// Function to handle the save request made by a thread
+// Current flow: Receive the message
+//				 Acquire lock for the filestate
+// 				 Flatten the rope
+//  		 	 Release the lock for the filestate
+fn handle_save(thread_local: &mut ThreadState, _msg: Message) -> Result<(), Box<dyn Error>> {
+	// thread_local
+	// 	.files
+	// 	.read()
+	// 	.
+	OK(())
+}
+
+
 // Takes a message and the current client's state, processes it, and returns a message to reply with
 pub fn process_message(thread_local: &mut ThreadState, msg: Message) -> (Message, bool) {
 	match msg {
 		Message::Echo(inner) => (Message::Echo(inner), false),
 		Message::OpenReq(inner) => match open_file(thread_local, &inner) {
+			// TODO Multithreading: Add new clients here, update the ThreadState's files
 			Ok(_) => (Message::OpenResp(true), false),
 			Err(e) => (Message::OpenResp(false), false),
 		},
@@ -87,6 +102,13 @@ pub fn process_message(thread_local: &mut ThreadState, msg: Message) -> (Message
 			// TODO Do read
 			let resp_data = Vec::new();
 			(Message::ReadResp(resp_data), false)
+		}
+		Message::SaveReq(inner) => {
+			// Flatten the rope & save the file
+			// Current assumption is that client will have the most up-to-date version and is happy with
+			// having that version being written to file
+			// TODO Multithreading: Consider the client not having the most updated file, thus saving the altered view from another client.
+
 		}
 		_ => (Message::Invalid, false),
 	}
