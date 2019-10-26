@@ -36,6 +36,7 @@ enum Message {
 	WriteResp,
 	ReadReq(ReadReqData),
 	ReadResp(Vec<u8>),
+	SaveReq,
 }
 
 struct FileState {
@@ -147,7 +148,14 @@ fn process_message(thread_local: &mut ThreadState, msg: Message) -> (Message, bo
 	}
 }
 
-
+// Function to handle the save request made by a thread
+// fn handle_save(thread_local: &mut ThreadState, _msg: Message) -> Result<(), Box<dyn Error>> {
+// 	thread_local
+// 		.files
+// 		.read()
+// 		.
+// 	OK(())
+// }
 
 // The main function run by the client thread
 fn client_thread(thread_local: &mut ThreadState) -> Result<(), Box<dyn Error>> {
