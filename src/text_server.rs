@@ -28,8 +28,8 @@ struct ReadReqData {
 
 #[derive(Serialize, Deserialize)]
 struct ReadRespData {
-    data: Vec<u8>,
-    error: String,
+	data: Vec<u8>,
+	error: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -41,7 +41,7 @@ enum Message {
 	WriteReq(WriteReqData),
 	WriteResp,
 	ReadReq(ReadReqData),
-    ReadResp(ReadRespData),
+	ReadResp(ReadRespData),
 }
 
 struct FileState {
@@ -121,13 +121,13 @@ fn open_file(thread_local: &mut ThreadState, path: &str) -> Result<PathBuf, Box<
 // Returns part of a file, starting from 'from' and ending at
 // 'to', where 'from' and 'to' are byte offsets.
 fn read_file(thread_local: &ThreadState, from: usize, to: usize) -> Result<Vec<u8>, Box<dyn Error>> {
+	let file_loc = thread_local.current_file_loc
+		.as_ref().ok_or("File path not given")?;
+	let files = thread_local
+		.files.read().or(Err("Could not read lock file map"))?;
+	let read_rope = &files.get(file_loc).ok_or("File doesn't exist")?.rope;
 
-    let file_loc = thread_local.current_file_loc.ok_or("File path not given")?;
-    let read_rope = thread_local
-       .files.read().or(Err("Could not read lock file map"))?
-       .get(&file_loc).ok_or("File doesn't exist")?
-       .rope;
-    let read_part = read_rope.collect(from, to)?
+	read_rope.collect(from, to)
 }
 
 // Takes a message and the current client's state, processes it, and returns a message to reply with
@@ -144,15 +144,16 @@ fn process_message(thread_local: &mut ThreadState, msg: Message) -> (Message, bo
 		}
 		Message::ReadReq(inner) => {
 			// TODO Do read
-            let read_from = inner.offset;
-            let read_to = inner.offset + inner.len - 1;
-            match read_file(thread_local, read_from, read_to) {
-                Ok(data) => (Message::ReadResp(
-                        ReadRespData{ data, error: "" }),
-                        false),
-                Err(error) => (Message::ReadResp(
-                        ReadRespData{ data: Vec::new(), error }, false),
-            }
+			let read_from = inner.offset;
+			let read_to = inner.offset + inner.len - 1;
+			match read_file(thread_local, read_from, read_to) {
+				Ok(data) => (Message::ReadResp(
+						ReadRespData{ data, error: String::new() }),
+						false),
+				Err(e) => (Message::ReadResp(
+						ReadRespData{ data: Vec::new(), error: e.to_string() }),
+						false),
+			}
 
 		}
 		_ => (Message::Invalid, false),
@@ -202,13 +203,13 @@ fn client_thread(thread_local: &mut ThreadState) -> Result<(), Box<dyn Error>> {
 		}
 
 		// thread_local
-		// 	.thread_shared
-		// 	.get(&thread_local.thread_id)
-		// 	.ok_or("Thread local storage does not exist")?
-		// 	.lock()
-		// 	.or(Err("Unable to lock thread shared data"))?
-		// 	.writer
-		// 	.flush()?;
+		//	.thread_shared
+		//	.get(&thread_local.thread_id)
+		//	.ok_or("Thread local storage does not exist")?
+		//	.lock()
+		//	.or(Err("Unable to lock thread shared data"))?
+		//	.writer
+		//	.flush()?;
 
 		if exit {
 			// Client has finished connection
