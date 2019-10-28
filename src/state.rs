@@ -1,12 +1,11 @@
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
-use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Write};
-use std::net::{TcpListener, TcpStream, ToSocketAddrs};
+use std::net::TcpStream;
 use std::ops::Deref;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex, RwLock};
-use std::thread::{current, spawn, ThreadId};
+use std::thread::{current, ThreadId};
 
 use crate::rope::Rope;
 

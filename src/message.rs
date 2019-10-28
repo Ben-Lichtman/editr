@@ -1,17 +1,12 @@
-use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fs::File;
-use std::io::{BufReader, BufWriter, Read, Write};
-use std::net::{TcpListener, TcpStream, ToSocketAddrs};
+use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, RwLock};
 
 use serde::{Deserialize, Serialize};
 
 use crate::rope::Rope;
-use crate::state::{
-	FileState, FileStateContainer, ThreadShared, ThreadSharedContainer, ThreadState,
-};
+use crate::state::{FileState, ThreadState};
 
 #[derive(Serialize, Deserialize)]
 pub struct WriteReqData {
@@ -77,7 +72,7 @@ pub fn process_message(thread_local: &mut ThreadState, msg: Message) -> (Message
 		Message::Echo(inner) => (Message::Echo(inner), false),
 		Message::OpenReq(inner) => match open_file(thread_local, &inner) {
 			Ok(_) => (Message::OpenResp(true), false),
-			Err(e) => (Message::OpenResp(false), false),
+			Err(_) => (Message::OpenResp(false), false),
 		},
 		Message::WriteReq(inner) => {
 			// TODO Do write

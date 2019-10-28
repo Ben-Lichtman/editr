@@ -1,16 +1,13 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::error::Error;
-use std::fs::File;
-use std::io::{BufReader, BufWriter, Read, Write};
-use std::net::{TcpListener, TcpStream, ToSocketAddrs};
+use std::net::{TcpListener, ToSocketAddrs};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, RwLock};
-use std::thread::{current, spawn, ThreadId};
+use std::thread::{spawn, ThreadId};
 
 use serde_json;
 
 use crate::message::{process_message, Message};
-use crate::rope::Rope;
 use crate::state::{FileState, ThreadShared, ThreadState};
 
 const MAX_MESSAGE: usize = 1024;
