@@ -29,11 +29,11 @@ pub enum Message {
 	OpenReq(String),
 	OpenResp(bool),
 	WriteReq(WriteReqData),
-	WriteResp,
+	WriteResp(bool),
 	ReadReq(ReadReqData),
 	ReadResp(Vec<u8>),
 	SaveReq,
-	SaveResp,
+	SaveResp(bool),
 }
 
 fn create_file(thread_local: &mut ThreadState, path: &str) -> Result<(), Box<dyn Error>> {
@@ -81,7 +81,7 @@ fn open_file(thread_local: &mut ThreadState, path: &str) -> Result<PathBuf, Box<
 //				 Acquire lock for the filestate
 // 				 Flatten the rope
 //  		 	 Release the lock for the filestate
-fn handle_save(thread_local: &mut ThreadState, _msg: Message) -> Result<(), Box<dyn Error>> {
+fn save_file(thread_local: &mut ThreadState) -> Result<(), Box<dyn Error>> {
 	// thread_local
 	// 	.files
 	// 	.read()
@@ -104,20 +104,17 @@ pub fn process_message(thread_local: &mut ThreadState, msg: Message) -> (Message
 		},
 		Message::WriteReq(inner) => {
 			// TODO Do write
-			(Message::WriteResp, false)
+			(Message::WriteResp(true), false)
 		}
 		Message::ReadReq(inner) => {
 			// TODO Do read
 			let resp_data = Vec::new();
 			(Message::ReadResp(resp_data), false)
 		}
-		Message::SaveReq => {
-			// Flatten the rope & save the file
-			// Current assumption is that client will have the most up-to-date version and is happy with
-			// having that version being written to file
-			// TODO Multithreading: Consider the client not having the most updated file, thus saving the altered view from another client.
-			(Message::SaveResp, false)
-		}
+		Message::SaveReq => match save_file(thread_local) {
+			Ok(_) => (Message::SaveResp(true), false),
+			Err(_) => (Message::SaveResp(false), false),
+		},
 		_ => (Message::Invalid, false),
 	}
 }
