@@ -98,13 +98,16 @@ impl ThreadState {
 	pub fn insert_thread_shared(&mut self, stream: TcpStream) -> Result<(), Box<dyn Error>> {
 		self.thread_shared
 			.write()
-			.unwrap()
+			.map_err(|e| e.to_string())?
 			.insert(self.thread_id, Mutex::new(ThreadShared::new(stream)));
 		Ok(())
 	}
 
 	pub fn remove_thread_shared(&mut self) -> Result<(), Box<dyn Error>> {
-		self.thread_shared.write().unwrap().remove(&self.thread_id);
+		self.thread_shared
+			.write()
+			.map_err(|e| e.to_string())?
+			.remove(&self.thread_id);
 		Ok(())
 	}
 
