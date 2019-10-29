@@ -1,5 +1,5 @@
 use std::error::Error;
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
@@ -24,6 +24,8 @@ pub struct ReadReqData {
 pub enum Message {
 	Invalid,
 	Echo(Vec<u8>),
+	CreateReq(String),
+	CreateResp(bool),
 	OpenReq(String),
 	OpenResp(bool),
 	WriteReq(WriteReqData),
@@ -32,6 +34,12 @@ pub enum Message {
 	ReadResp(Vec<u8>),
 	SaveReq,
 	SaveResp,
+}
+
+fn create_file(thread_local: &mut ThreadState, path: &str) -> Result<(), Box<dyn Error>> {
+	let file = OpenOptions::new().create(true).open(path)?;
+
+	Ok(())
 }
 
 fn open_file(thread_local: &mut ThreadState, path: &str) -> Result<PathBuf, Box<dyn Error>> {
@@ -85,6 +93,10 @@ fn handle_save(thread_local: &mut ThreadState, _msg: Message) -> Result<(), Box<
 pub fn process_message(thread_local: &mut ThreadState, msg: Message) -> (Message, bool) {
 	match msg {
 		Message::Echo(inner) => (Message::Echo(inner), false),
+		Message::CreateReq(inner) => match create_file(thread_local, &inner) {
+			Ok(_) => (Message::CreateResp(true), false),
+			Err(_) => (Message::CreateResp(false), false),
+		},
 		Message::OpenReq(inner) => match open_file(thread_local, &inner) {
 			// TODO Multithreading: Add new clients here, update the ThreadState's files
 			Ok(_) => (Message::OpenResp(true), false),

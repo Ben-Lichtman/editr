@@ -73,11 +73,11 @@ pub fn start<A: ToSocketAddrs>(path: &Path, address: A) -> Result<(), Box<dyn Er
 
 			let mut thread_local = ThreadState::new(thread_shared, files, canonical_home);
 
-			thread_local.insert_thread_shared(stream);
+			thread_local.insert_thread_shared(stream).unwrap();
 
 			client_thread(&mut thread_local).unwrap();
 
-			thread_local.remove_thread_shared();
+			thread_local.remove_thread_shared().unwrap();
 		});
 	}
 
