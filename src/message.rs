@@ -30,6 +30,8 @@ pub enum Message {
 	WriteResp,
 	ReadReq(ReadReqData),
 	ReadResp(Vec<u8>),
+	SaveReq,
+	SaveResp,
 }
 
 fn open_file(thread_local: &mut ThreadState, path: &str) -> Result<PathBuf, Box<dyn Error>> {
@@ -76,9 +78,8 @@ fn handle_save(thread_local: &mut ThreadState, _msg: Message) -> Result<(), Box<
 	// 	.files
 	// 	.read()
 	// 	.
-	OK(())
+	Ok(())
 }
-
 
 // Takes a message and the current client's state, processes it, and returns a message to reply with
 pub fn process_message(thread_local: &mut ThreadState, msg: Message) -> (Message, bool) {
@@ -98,12 +99,12 @@ pub fn process_message(thread_local: &mut ThreadState, msg: Message) -> (Message
 			let resp_data = Vec::new();
 			(Message::ReadResp(resp_data), false)
 		}
-		Message::SaveReq(inner) => {
+		Message::SaveReq => {
 			// Flatten the rope & save the file
 			// Current assumption is that client will have the most up-to-date version and is happy with
 			// having that version being written to file
 			// TODO Multithreading: Consider the client not having the most updated file, thus saving the altered view from another client.
-
+			(Message::SaveResp, false)
 		}
 		_ => (Message::Invalid, false),
 	}
