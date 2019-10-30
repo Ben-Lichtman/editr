@@ -28,7 +28,7 @@ pub enum CreateResult {
 
 #[derive(Serialize, Deserialize)]
 pub enum OpenResult {
-	Ok,
+	Ok(PathBuf),
 	Err(String),
 }
 
@@ -66,64 +66,16 @@ pub enum Message {
 	SaveResp(SaveResult),
 }
 
-fn create_file(thread_local: &mut ThreadState, path: &str) -> Result<(), Box<dyn Error>> {
-	OpenOptions::new().create(true).open(path)?;
-
-	Ok(())
-}
-
-fn open_file(thread_local: &mut ThreadState, path: &str) -> Result<PathBuf, Box<dyn Error>> {
-	// TODO Remove self from bookkeeping of a file already opened
-	// TODO possibly close file that was already opened
-	let path = Path::new(path);
-
-	let canonical_path = path.canonicalize()?;
-
-	// Check that path is valid given client home
-	if !canonical_path.starts_with(thread_local.canonical_home()) {
-		return Err("Invalid file path".into());
-	}
-
-	// Make sure the files hashmap contains this file
-	if !thread_local.contains_file(&canonical_path)? {
-		// Read file
-		let mut buffer = Vec::new();
-		let mut file = File::open(&canonical_path)?;
-		file.read_to_end(&mut buffer)?;
-
-		// Add to rope
-		let rope = Rope::new();
-		rope.insert_at(0, &buffer)?;
-
-		thread_local.insert_files(canonical_path.clone(), FileState::new(rope))?;
-	}
-
-	// Add bookkeeping
-	thread_local.add_file_bookkeeping(&canonical_path)?;
-
-	thread_local.current_file_loc = Some(canonical_path.clone());
-
-	Ok(canonical_path)
-}
-
-// Function to handle the save request made by a thread
-// Current flow: Receive the message
-//				 Acquire lock for the filestate
-// 				 Flatten the rope
-//  		 	 Release the lock for the filestate
-fn save_file(thread_local: &mut ThreadState) -> Result<(), Box<dyn Error>> { Ok(()) }
-
 // Takes a message and the current client's state, processes it, and returns a message to reply with
 pub fn process_message(thread_local: &mut ThreadState, msg: Message) -> (Message, bool) {
 	match msg {
 		Message::Echo(inner) => (Message::Echo(inner), false),
-		Message::CreateReq(inner) => match create_file(thread_local, &inner) {
+		Message::CreateReq(inner) => match thread_local.file_create(&inner) {
 			Ok(_) => (Message::CreateResp(CreateResult::Ok), false),
 			Err(e) => (Message::CreateResp(CreateResult::Err(e.to_string())), false),
 		},
-		Message::OpenReq(inner) => match open_file(thread_local, &inner) {
-			// TODO Multithreading: Add new clients here, update the ThreadState's files
-			Ok(_) => (Message::OpenResp(OpenResult::Ok), false),
+		Message::OpenReq(inner) => match thread_local.file_open(&inner) {
+			Ok(p) => (Message::OpenResp(OpenResult::Ok(p)), false),
 			Err(e) => (Message::OpenResp(OpenResult::Err(e.to_string())), false),
 		},
 		Message::WriteReq(inner) => match thread_local.file_write(inner.offset, &inner.data) {
@@ -138,7 +90,7 @@ pub fn process_message(thread_local: &mut ThreadState, msg: Message) -> (Message
 				Err(e) => (Message::ReadResp(ReadResult::Err(e.to_string())), false),
 			}
 		}
-		Message::SaveReq => match save_file(thread_local) {
+		Message::SaveReq => match thread_local.file_save() {
 			Ok(_) => (Message::SaveResp(SaveResult::Ok), false),
 			Err(e) => (Message::SaveResp(SaveResult::Err(e.to_string())), false),
 		},
