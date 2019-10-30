@@ -21,9 +21,9 @@ pub struct ReadReqData {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct ReadRespData {
-	data: Vec<u8>,
-	error: String,
+pub enum ReadRespData {
+	Ok(Vec<u8>),
+	Err(String),
 }
 
 #[derive(Serialize, Deserialize)]
@@ -110,20 +110,8 @@ pub fn process_message(thread_local: &mut ThreadState, msg: Message) -> (Message
 			let read_from = inner.offset;
 			let read_to = inner.offset + inner.len;
 			match thread_local.file_read(read_from, read_to) {
-				Ok(data) => (
-					Message::ReadResp(ReadRespData {
-						data,
-						error: String::new(),
-					}),
-					false,
-				),
-				Err(e) => (
-					Message::ReadResp(ReadRespData {
-						data: Vec::new(),
-						error: e.to_string(),
-					}),
-					false,
-				),
+				Ok(data) => (Message::ReadResp(ReadRespData::Ok(data)), false),
+				Err(e) => (Message::ReadResp(ReadRespData::Err(e.to_string())), false),
 			}
 		}
 		Message::SaveReq => match save_file(thread_local) {
