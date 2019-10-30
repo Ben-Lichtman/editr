@@ -26,7 +26,7 @@ pub struct ThreadIO {
 
 pub struct ThreadState {
 	thread_id: ThreadId,
-	thread_io: ThreadIOContainer,
+	threads_io: ThreadIOContainer,
 	files: FileStateContainer,
 	canonical_home: PathBuf,
 	pub current_file_loc: Option<PathBuf>,
@@ -58,20 +58,20 @@ impl ThreadIO {
 
 impl ThreadState {
 	pub fn new(
-		thread_io: ThreadIOContainer,
+		threads_io: ThreadIOContainer,
 		files: FileStateContainer,
 		canonical_home: PathBuf,
 	) -> ThreadState {
 		ThreadState {
 			thread_id: current().id(),
-			thread_io,
+			threads_io,
 			files,
 			canonical_home,
 			current_file_loc: None,
 		}
 	}
 
-	fn thread_hashmap_read_op<
+	fn shared_io_read_op<
 		T,
 		F: FnOnce(
 			RwLockReadGuard<HashMap<ThreadId, Mutex<ThreadIO>>>,
@@ -80,10 +80,10 @@ impl ThreadState {
 		&self,
 		f: F,
 	) -> Result<T, Box<dyn Error>> {
-		f(self.thread_io.read().map_err(|e| e.to_string())?)
+		f(self.threads_io.read().map_err(|e| e.to_string())?)
 	}
 
-	fn thread_hashmap_write_op<
+	fn shared_io_write_op<
 		T,
 		F: FnOnce(
 			RwLockWriteGuard<HashMap<ThreadId, Mutex<ThreadIO>>>,
@@ -92,7 +92,7 @@ impl ThreadState {
 		&self,
 		f: F,
 	) -> Result<T, Box<dyn Error>> {
-		f(self.thread_io.write().map_err(|e| e.to_string())?)
+		f(self.threads_io.write().map_err(|e| e.to_string())?)
 	}
 
 	fn thread_io_op<T, F: FnOnce(MutexGuard<ThreadIO>) -> Result<T, Box<dyn Error>>>(
@@ -100,7 +100,7 @@ impl ThreadState {
 		id: ThreadId,
 		f: F,
 	) -> Result<T, Box<dyn Error>> {
-		self.thread_hashmap_read_op(|m| {
+		self.shared_io_read_op(|m| {
 			f(m.get(&id)
 				.ok_or("Thread local storage does not exist")?
 				.lock()
@@ -177,14 +177,14 @@ impl ThreadState {
 	}
 
 	pub fn insert_thread_io(&mut self, stream: TcpStream) -> Result<(), Box<dyn Error>> {
-		self.thread_hashmap_write_op(|mut m| {
+		self.shared_io_write_op(|mut m| {
 			m.insert(self.thread_id, Mutex::new(ThreadIO::new(stream)));
 			Ok(())
 		})
 	}
 
 	pub fn remove_thread_io(&mut self) -> Result<(), Box<dyn Error>> {
-		self.thread_hashmap_write_op(|mut m| {
+		self.shared_io_write_op(|mut m| {
 			m.remove(&self.thread_id);
 			Ok(())
 		})
