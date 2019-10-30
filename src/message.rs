@@ -109,7 +109,7 @@ pub fn process_message(thread_local: &mut ThreadState, msg: Message) -> (Message
 		Message::ReadReq(inner) => {
 			let read_from = inner.offset;
 			let read_to = inner.offset + inner.len;
-			match thread_local.read_file(read_from, read_to) {
+			match thread_local.file_read(read_from, read_to) {
 				Ok(data) => (
 					Message::ReadResp(ReadRespData {
 						data,

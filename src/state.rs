@@ -189,20 +189,25 @@ impl ThreadState {
 		})
 	}
 
-	pub fn read(&self, buffer: &mut [u8]) -> Result<usize, Box<dyn Error>> {
+	pub fn socket_read(&self, buffer: &mut [u8]) -> Result<usize, Box<dyn Error>> {
 		self.thread_shared_op(&self.thread_id, |mut m| Ok(m.reader.read(buffer)?))
 	}
 
-	pub fn write(&self, buffer: &[u8]) -> Result<usize, Box<dyn Error>> {
+	pub fn socket_write(&self, buffer: &[u8]) -> Result<usize, Box<dyn Error>> {
 		self.thread_shared_op(&self.thread_id, |mut m| Ok(m.writer.write(buffer)?))
 	}
 
-	// Returns part of a file, starting from 'from' and ending at
-	// 'to', where 'from' and 'to' are byte offsets.
-	pub fn read_file(&self, from: usize, to: usize) -> Result<Vec<u8>, Box<dyn Error>> {
+	pub fn file_read(&self, from: usize, to: usize) -> Result<Vec<u8>, Box<dyn Error>> {
 		self.file_state_read_op(
 			self.current_file_loc.as_ref().ok_or("No file opened")?,
 			|m| m.collect(from, to),
+		)
+	}
+
+	pub fn file_write(&self, offset: usize, data: &[u8]) -> Result<(), Box<dyn Error>> {
+		self.file_state_read_op(
+			self.current_file_loc.as_ref().ok_or("No file opened")?,
+			|m| m.insert_at(offset, data),
 		)
 	}
 }
