@@ -10,7 +10,7 @@ use std::thread::{current, ThreadId};
 
 use crate::rope::Rope;
 
-pub type ThreadSharedContainer = Arc<RwLock<HashMap<ThreadId, Mutex<ThreadShared>>>>;
+pub type ThreadIOContainer = Arc<RwLock<HashMap<ThreadId, Mutex<ThreadIO>>>>;
 
 pub type FileStateContainer = Arc<RwLock<HashMap<PathBuf, FileState>>>;
 
@@ -19,14 +19,14 @@ pub struct FileState {
 	clients: HashSet<ThreadId>,
 }
 
-pub struct ThreadShared {
+pub struct ThreadIO {
 	reader: BufReader<TcpStream>,
 	writer: BufWriter<TcpStream>,
 }
 
 pub struct ThreadState {
 	thread_id: ThreadId,
-	thread_shared: ThreadSharedContainer,
+	thread_io: ThreadIOContainer,
 	files: FileStateContainer,
 	canonical_home: PathBuf,
 	pub current_file_loc: Option<PathBuf>,
@@ -47,9 +47,9 @@ impl FileState {
 	}
 }
 
-impl ThreadShared {
-	pub fn new(stream: TcpStream) -> ThreadShared {
-		ThreadShared {
+impl ThreadIO {
+	pub fn new(stream: TcpStream) -> ThreadIO {
+		ThreadIO {
 			reader: BufReader::new(stream.try_clone().unwrap()),
 			writer: BufWriter::with_capacity(0, stream.try_clone().unwrap()),
 		}
@@ -58,13 +58,13 @@ impl ThreadShared {
 
 impl ThreadState {
 	pub fn new(
-		thread_shared: ThreadSharedContainer,
+		thread_io: ThreadIOContainer,
 		files: FileStateContainer,
 		canonical_home: PathBuf,
 	) -> ThreadState {
 		ThreadState {
 			thread_id: current().id(),
-			thread_shared,
+			thread_io,
 			files,
 			canonical_home,
 			current_file_loc: None,
@@ -74,28 +74,28 @@ impl ThreadState {
 	fn thread_hashmap_read_op<
 		T,
 		F: FnOnce(
-			RwLockReadGuard<HashMap<ThreadId, Mutex<ThreadShared>>>,
+			RwLockReadGuard<HashMap<ThreadId, Mutex<ThreadIO>>>,
 		) -> Result<T, Box<dyn Error>>,
 	>(
 		&self,
 		f: F,
 	) -> Result<T, Box<dyn Error>> {
-		f(self.thread_shared.read().map_err(|e| e.to_string())?)
+		f(self.thread_io.read().map_err(|e| e.to_string())?)
 	}
 
 	fn thread_hashmap_write_op<
 		T,
 		F: FnOnce(
-			RwLockWriteGuard<HashMap<ThreadId, Mutex<ThreadShared>>>,
+			RwLockWriteGuard<HashMap<ThreadId, Mutex<ThreadIO>>>,
 		) -> Result<T, Box<dyn Error>>,
 	>(
 		&self,
 		f: F,
 	) -> Result<T, Box<dyn Error>> {
-		f(self.thread_shared.write().map_err(|e| e.to_string())?)
+		f(self.thread_io.write().map_err(|e| e.to_string())?)
 	}
 
-	fn thread_shared_op<T, F: FnOnce(MutexGuard<ThreadShared>) -> Result<T, Box<dyn Error>>>(
+	fn thread_io_op<T, F: FnOnce(MutexGuard<ThreadIO>) -> Result<T, Box<dyn Error>>>(
 		&self,
 		id: ThreadId,
 		f: F,
@@ -176,14 +176,14 @@ impl ThreadState {
 		})
 	}
 
-	pub fn insert_thread_shared(&mut self, stream: TcpStream) -> Result<(), Box<dyn Error>> {
+	pub fn insert_thread_io(&mut self, stream: TcpStream) -> Result<(), Box<dyn Error>> {
 		self.thread_hashmap_write_op(|mut m| {
-			m.insert(self.thread_id, Mutex::new(ThreadShared::new(stream)));
+			m.insert(self.thread_id, Mutex::new(ThreadIO::new(stream)));
 			Ok(())
 		})
 	}
 
-	pub fn remove_thread_shared(&mut self) -> Result<(), Box<dyn Error>> {
+	pub fn remove_thread_io(&mut self) -> Result<(), Box<dyn Error>> {
 		self.thread_hashmap_write_op(|mut m| {
 			m.remove(&self.thread_id);
 			Ok(())
@@ -230,11 +230,11 @@ impl ThreadState {
 	}
 
 	pub fn socket_read(&self, buffer: &mut [u8]) -> Result<usize, Box<dyn Error>> {
-		self.thread_shared_op(self.thread_id, |mut m| Ok(m.reader.read(buffer)?))
+		self.thread_io_op(self.thread_id, |mut m| Ok(m.reader.read(buffer)?))
 	}
 
 	pub fn socket_write(&self, buffer: &[u8]) -> Result<usize, Box<dyn Error>> {
-		self.thread_shared_op(self.thread_id, |mut m| Ok(m.writer.write(buffer)?))
+		self.thread_io_op(self.thread_id, |mut m| Ok(m.writer.write(buffer)?))
 	}
 
 	pub fn file_read(&self, from: usize, to: usize) -> Result<Vec<u8>, Box<dyn Error>> {
