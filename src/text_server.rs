@@ -8,7 +8,7 @@ use std::thread::{spawn, ThreadId};
 use serde_json;
 
 use crate::message::{process_message, Message};
-use crate::state::{FileState, ThreadShared, ThreadState};
+use crate::state::{FileState, ThreadIO, ThreadState};
 
 const MAX_MESSAGE: usize = 1024;
 
@@ -37,7 +37,7 @@ fn client_thread(thread_local: &mut ThreadState) -> Result<(), Box<dyn Error>> {
 		}
 
 		// thread_local
-		//	.thread_shared
+		//	.thread_io
 		//	.get(&thread_local.thread_id)
 		//	.ok_or("Thread local storage does not exist")?
 		//	.lock()
@@ -60,24 +60,24 @@ pub fn start<A: ToSocketAddrs>(path: &Path, address: A) -> Result<(), Box<dyn Er
 
 	let files: Arc<RwLock<HashMap<PathBuf, FileState>>> = Arc::new(RwLock::new(HashMap::new()));
 
-	let thread_shared: Arc<RwLock<HashMap<ThreadId, Mutex<ThreadShared>>>> =
+	let thread_io: Arc<RwLock<HashMap<ThreadId, Mutex<ThreadIO>>>> =
 		Arc::new(RwLock::new(HashMap::new()));
 
 	for stream_result in listener.incoming() {
 		let canonical_home = canonical_home.clone();
 		let files = files.clone();
-		let thread_shared = thread_shared.clone();
+		let thread_io = thread_io.clone();
 
 		spawn(move || {
 			let stream = stream_result.unwrap();
 
-			let mut thread_local = ThreadState::new(thread_shared, files, canonical_home);
+			let mut thread_local = ThreadState::new(thread_io, files, canonical_home);
 
-			thread_local.insert_thread_shared(stream).unwrap();
+			thread_local.insert_thread_io(stream).unwrap();
 
 			client_thread(&mut thread_local).unwrap();
 
-			thread_local.remove_thread_shared().unwrap();
+			thread_local.remove_thread_io().unwrap();
 		});
 	}
 
