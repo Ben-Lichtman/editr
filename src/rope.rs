@@ -290,6 +290,10 @@ impl Rope {
 
 	pub fn is_empty(&self) -> Result<bool, Box<dyn Error>> { Ok(self.len()? == 0) }
 
+	pub fn flatten(&self) -> Result<(), Box<dyn Error>> {
+		Ok(self.root.write().map_err(|e| e.to_string())?.flatten())
+	}
+
 	pub fn collect(&self, from: usize, to: usize) -> Result<Vec<u8>, Box<dyn Error>> {
 		let mut collection = Vec::new();
 		let mut counter = 0usize;
