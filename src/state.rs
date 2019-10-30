@@ -1,4 +1,5 @@
 pub mod shared_io_container;
+mod thread_io;
 
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
@@ -11,7 +12,7 @@ use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::thread::{current, ThreadId};
 
 use crate::rope::Rope;
-pub use crate::state::shared_io_container::SharedIOContainer;
+use crate::state::shared_io_container::SharedIOContainer;
 
 pub type FileStateContainer = Arc<RwLock<HashMap<PathBuf, FileState>>>;
 
