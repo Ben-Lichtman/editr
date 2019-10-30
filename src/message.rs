@@ -82,19 +82,6 @@ fn open_file(thread_local: &mut ThreadState, path: &str) -> Result<PathBuf, Box<
 	Ok(canonical_path)
 }
 
-// Returns part of a file, starting from 'from' and ending at
-// 'to', where 'from' and 'to' are byte offsets.
-fn read_file(thread_local: &ThreadState, from: usize, to: usize) -> Result<Vec<u8>, Box<dyn Error>> {
-	//let file_loc = thread_local.current_file_loc
-	//	.as_ref().ok_or("File path not given")?;
-	//let files = thread_local
-	//	.files.read().or(Err("Could not read lock file map"))?;
-	//let read_rope = &files.get(file_loc).ok_or("File doesn't exist")?.rope;
-
-	//read_rope.collect(from, to)
-	Ok(Vec::new())
-}
-
 // Function to handle the save request made by a thread
 // Current flow: Receive the message
 //				 Acquire lock for the filestate
@@ -126,10 +113,9 @@ pub fn process_message(thread_local: &mut ThreadState, msg: Message) -> (Message
 			(Message::WriteResp(true), false)
 		}
 		Message::ReadReq(inner) => {
-			// TODO Do read
 			let read_from = inner.offset;
 			let read_to = inner.offset + inner.len - 1;
-			match read_file(thread_local, read_from, read_to) {
+			match thread_local.read_file(read_from, read_to) {
 				Ok(data) => (Message::ReadResp(
 						ReadRespData{ data, error: String::new() }),
 						false),
