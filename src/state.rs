@@ -1,9 +1,10 @@
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
+use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter, Read, Write};
 use std::net::TcpStream;
 use std::ops::Deref;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::thread::{current, ThreadId};
 
@@ -189,6 +190,45 @@ impl ThreadState {
 		})
 	}
 
+	pub fn file_create(&self, path: &str) -> Result<(), Box<dyn Error>> {
+		OpenOptions::new().create(true).open(path)?;
+		Ok(())
+	}
+
+	pub fn file_open(&mut self, path: &str) -> Result<PathBuf, Box<dyn Error>> {
+		// TODO Remove self from bookkeeping of a file already opened
+		// TODO possibly close file that was already opened
+		let path = Path::new(path);
+
+		let canonical_path = path.canonicalize()?;
+
+		// Check that path is valid given client home
+		if !canonical_path.starts_with(self.canonical_home()) {
+			return Err("Invalid file path".into());
+		}
+
+		// Make sure the files hashmap contains this file
+		if !self.contains_file(&canonical_path)? {
+			// Read file
+			let mut buffer = Vec::new();
+			let mut file = File::open(&canonical_path)?;
+			file.read_to_end(&mut buffer)?;
+
+			// Add to rope
+			let rope = Rope::new();
+			rope.insert_at(0, &buffer)?;
+
+			self.insert_files(canonical_path.clone(), FileState::new(rope))?;
+		}
+
+		// Add bookkeeping
+		self.add_file_bookkeeping(&canonical_path)?;
+
+		self.current_file_loc = Some(canonical_path.clone());
+
+		Ok(canonical_path)
+	}
+
 	pub fn socket_read(&self, buffer: &mut [u8]) -> Result<usize, Box<dyn Error>> {
 		self.thread_shared_op(&self.thread_id, |mut m| Ok(m.reader.read(buffer)?))
 	}
@@ -208,6 +248,13 @@ impl ThreadState {
 		self.file_state_read_op(
 			self.current_file_loc.as_ref().ok_or("No file opened")?,
 			|m| m.insert_at(offset, data),
+		)
+	}
+
+	pub fn file_save(&self) -> Result<(), Box<dyn Error>> {
+		self.file_state_read_op(
+			self.current_file_loc.as_ref().ok_or("No file opened")?,
+			|m| m.flatten(),
 		)
 	}
 }
