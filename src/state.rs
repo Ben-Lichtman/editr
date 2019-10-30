@@ -97,11 +97,11 @@ impl ThreadState {
 
 	fn thread_shared_op<T, F: FnOnce(MutexGuard<ThreadShared>) -> Result<T, Box<dyn Error>>>(
 		&self,
-		id: &ThreadId,
+		id: ThreadId,
 		f: F,
 	) -> Result<T, Box<dyn Error>> {
 		self.thread_hashmap_read_op(|m| {
-			f(m.get(id)
+			f(m.get(&id)
 				.ok_or("Thread local storage does not exist")?
 				.lock()
 				.map_err(|e| e.to_string())?)
@@ -149,6 +149,13 @@ impl ThreadState {
 		})
 	}
 
+	fn add_file_bookkeeping(&mut self, key: &PathBuf) -> Result<(), Box<dyn Error>> {
+		self.file_state_write_op(key, |m| {
+			m.clients.insert(self.thread_id);
+			Ok(())
+		})
+	}
+
 	pub fn canonical_home(&self) -> &PathBuf { &self.canonical_home }
 
 	pub fn contains_file(&self, key: &PathBuf) -> Result<bool, Box<dyn Error>> {
@@ -179,13 +186,6 @@ impl ThreadState {
 	pub fn remove_thread_shared(&mut self) -> Result<(), Box<dyn Error>> {
 		self.thread_hashmap_write_op(|mut m| {
 			m.remove(&self.thread_id);
-			Ok(())
-		})
-	}
-
-	pub fn add_file_bookkeeping(&mut self, key: &PathBuf) -> Result<(), Box<dyn Error>> {
-		self.file_state_write_op(key, |m| {
-			m.clients.insert(self.thread_id);
 			Ok(())
 		})
 	}
@@ -230,11 +230,11 @@ impl ThreadState {
 	}
 
 	pub fn socket_read(&self, buffer: &mut [u8]) -> Result<usize, Box<dyn Error>> {
-		self.thread_shared_op(&self.thread_id, |mut m| Ok(m.reader.read(buffer)?))
+		self.thread_shared_op(self.thread_id, |mut m| Ok(m.reader.read(buffer)?))
 	}
 
 	pub fn socket_write(&self, buffer: &[u8]) -> Result<usize, Box<dyn Error>> {
-		self.thread_shared_op(&self.thread_id, |mut m| Ok(m.writer.write(buffer)?))
+		self.thread_shared_op(self.thread_id, |mut m| Ok(m.writer.write(buffer)?))
 	}
 
 	pub fn file_read(&self, from: usize, to: usize) -> Result<Vec<u8>, Box<dyn Error>> {
