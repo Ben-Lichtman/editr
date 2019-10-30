@@ -37,13 +37,13 @@ fn client_thread(thread_local: &mut ThreadState) -> Result<(), Box<dyn Error>> {
 		}
 
 		// thread_local
-		// 	.thread_shared
-		// 	.get(&thread_local.thread_id)
-		// 	.ok_or("Thread local storage does not exist")?
-		// 	.lock()
-		// 	.or(Err("Unable to lock thread shared data"))?
-		// 	.writer
-		// 	.flush()?;
+		//	.thread_shared
+		//	.get(&thread_local.thread_id)
+		//	.ok_or("Thread local storage does not exist")?
+		//	.lock()
+		//	.or(Err("Unable to lock thread shared data"))?
+		//	.writer
+		//	.flush()?;
 
 		if exit {
 			// Client has finished connection
