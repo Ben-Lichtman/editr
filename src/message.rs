@@ -67,7 +67,7 @@ pub enum Message {
 }
 
 fn create_file(thread_local: &mut ThreadState, path: &str) -> Result<(), Box<dyn Error>> {
-	let file = OpenOptions::new().create(true).open(path)?;
+	OpenOptions::new().create(true).open(path)?;
 
 	Ok(())
 }
