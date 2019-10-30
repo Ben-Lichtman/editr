@@ -4,7 +4,7 @@ use std::io::{BufReader, BufWriter, Read, Write};
 use std::net::TcpStream;
 use std::ops::Deref;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::thread::{current, ThreadId};
 
 use crate::rope::Rope;
@@ -72,79 +72,130 @@ impl ThreadState {
 		}
 	}
 
+	fn thread_hashmap_read_op<
+		T,
+		F: FnOnce(
+			RwLockReadGuard<HashMap<ThreadId, Mutex<ThreadShared>>>,
+		) -> Result<T, Box<dyn Error>>,
+	>(
+		&self,
+		f: F,
+	) -> Result<T, Box<dyn Error>> {
+		f(self.thread_shared.read().map_err(|e| e.to_string())?)
+	}
+
+	fn thread_hashmap_write_op<
+		T,
+		F: FnOnce(
+			RwLockWriteGuard<HashMap<ThreadId, Mutex<ThreadShared>>>,
+		) -> Result<T, Box<dyn Error>>,
+	>(
+		&self,
+		f: F,
+	) -> Result<T, Box<dyn Error>> {
+		f(self.thread_shared.write().map_err(|e| e.to_string())?)
+	}
+
+	fn thread_shared_op<T, F: FnOnce(MutexGuard<ThreadShared>) -> Result<T, Box<dyn Error>>>(
+		&self,
+		id: &ThreadId,
+		f: F,
+	) -> Result<T, Box<dyn Error>> {
+		self.thread_hashmap_read_op(|m| {
+			f(m.get(id)
+				.ok_or("Thread local storage does not exist")?
+				.lock()
+				.map_err(|e| e.to_string())?)
+		})
+	}
+
+	fn file_hashmap_read_op<
+		T,
+		F: FnOnce(RwLockReadGuard<HashMap<PathBuf, FileState>>) -> Result<T, Box<dyn Error>>,
+	>(
+		&self,
+		f: F,
+	) -> Result<T, Box<dyn Error>> {
+		f(self.files.read().map_err(|e| e.to_string())?)
+	}
+
+	fn file_hashmap_write_op<
+		T,
+		F: FnOnce(RwLockWriteGuard<HashMap<PathBuf, FileState>>) -> Result<T, Box<dyn Error>>,
+	>(
+		&self,
+		f: F,
+	) -> Result<T, Box<dyn Error>> {
+		f(self.files.write().map_err(|e| e.to_string())?)
+	}
+
+	fn file_state_read_op<T, F: FnOnce(&FileState) -> Result<T, Box<dyn Error>>>(
+		&self,
+		key: &PathBuf,
+		f: F,
+	) -> Result<T, Box<dyn Error>> {
+		self.file_hashmap_write_op(|m| {
+			f(m.get(key).ok_or("Thread local storage does not exist")?)
+		})
+	}
+
+	fn file_state_write_op<T, F: FnOnce(&mut FileState) -> Result<T, Box<dyn Error>>>(
+		&self,
+		key: &PathBuf,
+		f: F,
+	) -> Result<T, Box<dyn Error>> {
+		self.file_hashmap_write_op(|mut m| {
+			f(m.get_mut(key)
+				.ok_or("Thread local storage does not exist")?)
+		})
+	}
+
 	pub fn canonical_home(&self) -> &PathBuf { &self.canonical_home }
 
 	pub fn contains_file(&self, key: &PathBuf) -> Result<bool, Box<dyn Error>> {
-		Ok(self
-			.files
-			.read()
-			.map_err(|e| e.to_string())?
-			.contains_key(key))
+		self.file_hashmap_read_op(|m| Ok(m.contains_key(key)))
 	}
 
 	pub fn insert_files(&mut self, key: PathBuf, val: FileState) -> Result<(), Box<dyn Error>> {
-		self.files
-			.write()
-			.map_err(|e| e.to_string())?
-			.insert(key, val);
-		Ok(())
+		self.file_hashmap_write_op(|mut m| {
+			m.insert(key, val);
+			Ok(())
+		})
 	}
 
 	pub fn remove_files(&mut self, key: &PathBuf) -> Result<(), Box<dyn Error>> {
-		self.files.write().map_err(|e| e.to_string())?.remove(key);
-		Ok(())
+		self.file_hashmap_write_op(|mut m| {
+			m.remove(key);
+			Ok(())
+		})
 	}
 
 	pub fn insert_thread_shared(&mut self, stream: TcpStream) -> Result<(), Box<dyn Error>> {
-		self.thread_shared
-			.write()
-			.map_err(|e| e.to_string())?
-			.insert(self.thread_id, Mutex::new(ThreadShared::new(stream)));
-		Ok(())
+		self.thread_hashmap_write_op(|mut m| {
+			m.insert(self.thread_id, Mutex::new(ThreadShared::new(stream)));
+			Ok(())
+		})
 	}
 
 	pub fn remove_thread_shared(&mut self) -> Result<(), Box<dyn Error>> {
-		self.thread_shared
-			.write()
-			.map_err(|e| e.to_string())?
-			.remove(&self.thread_id);
-		Ok(())
+		self.thread_hashmap_write_op(|mut m| {
+			m.remove(&self.thread_id);
+			Ok(())
+		})
 	}
 
 	pub fn add_file_bookkeeping(&mut self, key: &PathBuf) -> Result<(), Box<dyn Error>> {
-		self.files
-			.write()
-			.map_err(|e| e.to_string())?
-			.get_mut(key)
-			.ok_or("Thread local storage does not exist")?
-			.clients
-			.insert(self.thread_id);
-		Ok(())
+		self.file_state_write_op(key, |m| {
+			m.clients.insert(self.thread_id);
+			Ok(())
+		})
 	}
 
 	pub fn read(&self, buffer: &mut [u8]) -> Result<usize, Box<dyn Error>> {
-		Ok(self
-			.thread_shared
-			.read()
-			.map_err(|e| e.to_string())?
-			.get(&self.thread_id)
-			.ok_or("Thread local storage does not exist")?
-			.lock()
-			.map_err(|e| e.to_string())?
-			.reader
-			.read(buffer)?)
+		self.thread_shared_op(&self.thread_id, |mut m| Ok(m.reader.read(buffer)?))
 	}
 
 	pub fn write(&self, buffer: &[u8]) -> Result<usize, Box<dyn Error>> {
-		Ok(self
-			.thread_shared
-			.read()
-			.map_err(|e| e.to_string())?
-			.get(&self.thread_id)
-			.ok_or("Thread local storage does not exist")?
-			.lock()
-			.map_err(|e| e.to_string())?
-			.writer
-			.write(buffer)?)
+		self.thread_shared_op(&self.thread_id, |mut m| Ok(m.writer.write(buffer)?))
 	}
 }
