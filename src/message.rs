@@ -108,14 +108,22 @@ pub fn process_message(thread_local: &mut ThreadState, msg: Message) -> (Message
 		}
 		Message::ReadReq(inner) => {
 			let read_from = inner.offset;
-			let read_to = inner.offset + inner.len - 1;
+			let read_to = inner.offset + inner.len;
 			match thread_local.read_file(read_from, read_to) {
-				Ok(data) => (Message::ReadResp(
-						ReadRespData{ data, error: String::new() }),
-						false),
-				Err(e) => (Message::ReadResp(
-						ReadRespData{ data: Vec::new(), error: e.to_string() }),
-						false),
+				Ok(data) => (
+					Message::ReadResp(ReadRespData {
+						data,
+						error: String::new(),
+					}),
+					false,
+				),
+				Err(e) => (
+					Message::ReadResp(ReadRespData {
+						data: Vec::new(),
+						error: e.to_string(),
+					}),
+					false,
+				),
 			}
 		}
 		Message::SaveReq => match save_file(thread_local) {
