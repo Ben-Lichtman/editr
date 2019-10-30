@@ -21,8 +21,32 @@ pub struct ReadReqData {
 }
 
 #[derive(Serialize, Deserialize)]
+pub enum CreateResult {
+	Ok,
+	Err(String),
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum OpenResult {
+	Ok,
+	Err(String),
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum WriteResult {
+	Ok,
+	Err(String),
+}
+
+#[derive(Serialize, Deserialize)]
 pub enum ReadResult {
 	Ok(Vec<u8>),
+	Err(String),
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum SaveResult {
+	Ok,
 	Err(String),
 }
 
@@ -31,15 +55,15 @@ pub enum Message {
 	Invalid,
 	Echo(Vec<u8>),
 	CreateReq(String),
-	CreateResp(bool),
+	CreateResp(CreateResult),
 	OpenReq(String),
-	OpenResp(bool),
+	OpenResp(OpenResult),
 	WriteReq(WriteReqData),
-	WriteResp(bool),
+	WriteResp(WriteResult),
 	ReadReq(ReadReqData),
 	ReadResp(ReadResult),
 	SaveReq,
-	SaveResp(bool),
+	SaveResp(SaveResult),
 }
 
 fn create_file(thread_local: &mut ThreadState, path: &str) -> Result<(), Box<dyn Error>> {
@@ -94,18 +118,18 @@ pub fn process_message(thread_local: &mut ThreadState, msg: Message) -> (Message
 	match msg {
 		Message::Echo(inner) => (Message::Echo(inner), false),
 		Message::CreateReq(inner) => match create_file(thread_local, &inner) {
-			Ok(_) => (Message::CreateResp(true), false),
-			Err(_) => (Message::CreateResp(false), false),
+			Ok(_) => (Message::CreateResp(CreateResult::Ok), false),
+			Err(e) => (Message::CreateResp(CreateResult::Err(e.to_string())), false),
 		},
 		Message::OpenReq(inner) => match open_file(thread_local, &inner) {
 			// TODO Multithreading: Add new clients here, update the ThreadState's files
-			Ok(_) => (Message::OpenResp(true), false),
-			Err(_) => (Message::OpenResp(false), false),
+			Ok(_) => (Message::OpenResp(OpenResult::Ok), false),
+			Err(e) => (Message::OpenResp(OpenResult::Err(e.to_string())), false),
 		},
-		Message::WriteReq(inner) => {
-			// TODO Do write
-			(Message::WriteResp(true), false)
-		}
+		Message::WriteReq(inner) => match thread_local.file_write(inner.offset, &inner.data) {
+			Ok(_) => (Message::WriteResp(WriteResult::Ok), false),
+			Err(e) => (Message::WriteResp(WriteResult::Err(e.to_string())), false),
+		},
 		Message::ReadReq(inner) => {
 			let read_from = inner.offset;
 			let read_to = inner.offset + inner.len;
@@ -115,8 +139,8 @@ pub fn process_message(thread_local: &mut ThreadState, msg: Message) -> (Message
 			}
 		}
 		Message::SaveReq => match save_file(thread_local) {
-			Ok(_) => (Message::SaveResp(true), false),
-			Err(_) => (Message::SaveResp(false), false),
+			Ok(_) => (Message::SaveResp(SaveResult::Ok), false),
+			Err(e) => (Message::SaveResp(SaveResult::Err(e.to_string())), false),
 		},
 		_ => (Message::Invalid, false),
 	}
