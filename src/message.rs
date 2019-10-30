@@ -81,13 +81,7 @@ fn open_file(thread_local: &mut ThreadState, path: &str) -> Result<PathBuf, Box<
 //				 Acquire lock for the filestate
 // 				 Flatten the rope
 //  		 	 Release the lock for the filestate
-fn save_file(thread_local: &mut ThreadState) -> Result<(), Box<dyn Error>> {
-	// thread_local
-	// 	.files
-	// 	.read()
-	// 	.
-	Ok(())
-}
+fn save_file(thread_local: &mut ThreadState) -> Result<(), Box<dyn Error>> { Ok(()) }
 
 // Takes a message and the current client's state, processes it, and returns a message to reply with
 pub fn process_message(thread_local: &mut ThreadState, msg: Message) -> (Message, bool) {
