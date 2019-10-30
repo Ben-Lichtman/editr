@@ -200,12 +200,9 @@ impl ThreadState {
 	// Returns part of a file, starting from 'from' and ending at
 	// 'to', where 'from' and 'to' are byte offsets.
 	pub fn read_file(&self, from: usize, to: usize) -> Result<Vec<u8>, Box<dyn Error>> {
-		let file_loc = self
-			.current_file_loc
-			.as_ref()
-			.ok_or("File path not given")?;
-		let files = self.files.read().map_err(|e| e.to_string())?;
-		let state = files.get(file_loc).ok_or("File doesn't exist")?;
-		state.collect(from, to)
+		self.file_state_read_op(
+			self.current_file_loc.as_ref().ok_or("No file opened")?,
+			|m| m.collect(from, to),
+		)
 	}
 }
