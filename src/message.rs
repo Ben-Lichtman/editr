@@ -21,7 +21,7 @@ pub struct ReadReqData {
 }
 
 #[derive(Serialize, Deserialize)]
-pub enum ReadRespData {
+pub enum ReadResult {
 	Ok(Vec<u8>),
 	Err(String),
 }
@@ -37,7 +37,7 @@ pub enum Message {
 	WriteReq(WriteReqData),
 	WriteResp(bool),
 	ReadReq(ReadReqData),
-	ReadResp(ReadRespData),
+	ReadResp(ReadResult),
 	SaveReq,
 	SaveResp(bool),
 }
@@ -110,8 +110,8 @@ pub fn process_message(thread_local: &mut ThreadState, msg: Message) -> (Message
 			let read_from = inner.offset;
 			let read_to = inner.offset + inner.len;
 			match thread_local.file_read(read_from, read_to) {
-				Ok(data) => (Message::ReadResp(ReadRespData::Ok(data)), false),
-				Err(e) => (Message::ReadResp(ReadRespData::Err(e.to_string())), false),
+				Ok(data) => (Message::ReadResp(ReadResult::Ok(data)), false),
+				Err(e) => (Message::ReadResp(ReadResult::Err(e.to_string())), false),
 			}
 		}
 		Message::SaveReq => match save_file(thread_local) {
