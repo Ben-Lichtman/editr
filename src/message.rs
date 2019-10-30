@@ -1,12 +1,8 @@
-use std::error::Error;
-use std::fs::{File, OpenOptions};
-use std::io::Read;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-use crate::rope::Rope;
-use crate::state::{FileState, ThreadState};
+use crate::state::ThreadState;
 
 #[derive(Serialize, Deserialize)]
 pub struct WriteReqData {
