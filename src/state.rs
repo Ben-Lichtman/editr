@@ -44,8 +44,6 @@ impl FileState {
 			clients: HashSet::new(),
 		}
 	}
-
-	pub fn get_rope(&self) -> &Rope { &self.rope }
 }
 
 impl ThreadShared {
@@ -207,7 +205,7 @@ impl ThreadState {
 			.as_ref()
 			.ok_or("File path not given")?;
 		let files = self.files.read().map_err(|e| e.to_string())?;
-		let rope = files.get(file_loc).ok_or("File doesn't exist")?.get_rope();
-		rope.collect(from, to)
+		let state = files.get(file_loc).ok_or("File doesn't exist")?;
+		state.collect(from, to)
 	}
 }
