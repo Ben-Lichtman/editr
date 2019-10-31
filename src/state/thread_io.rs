@@ -14,6 +14,7 @@ impl ThreadIO {
 		}
 	}
 
+	// Locks stream and applies op
 	pub fn apply<T, F: FnOnce(MutexGuard<IOBuffers>) -> Result<T, Box<dyn Error>>>(
 		&self,
 		op: F,
@@ -35,10 +36,12 @@ impl IOBuffers {
 		}
 	}
 
+	// Reads from reader into buffer
 	pub fn read(&mut self, buffer: &mut [u8]) -> Result<usize, Box<dyn Error>> {
 		Ok(self.reader.read(buffer)?)
 	}
 
+	// Writes from buffer into writer
 	pub fn write(&mut self, buffer: &[u8]) -> Result<usize, Box<dyn Error>> {
 		Ok(self.writer.write(buffer)?)
 	}
