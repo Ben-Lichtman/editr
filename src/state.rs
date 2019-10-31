@@ -1,5 +1,4 @@
 pub mod shared_io_container;
-mod thread_io;
 
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
