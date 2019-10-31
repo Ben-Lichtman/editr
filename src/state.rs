@@ -106,6 +106,13 @@ impl ThreadState {
 		})
 	}
 
+	pub fn remove_file_bookkeeping(&mut self, key: &PathBuf) -> Result<(), Box<dyn Error>> {
+		self.file_state_write_op(key, |m| {
+			m.clients.remove(&self.thread_id);
+			Ok(())
+		})
+	}
+
 	pub fn canonical_home(&self) -> &PathBuf { &self.canonical_home }
 
 	pub fn contains_file(&self, key: &PathBuf) -> Result<bool, Box<dyn Error>> {
@@ -139,12 +146,23 @@ impl ThreadState {
 		Ok(())
 	}
 
-	pub fn file_open(&mut self, path: &str) -> Result<PathBuf, Box<dyn Error>> {
-		// TODO Remove self from bookkeeping of a file already opened
-		// TODO possibly close file that was already opened
-		let path = Path::new(path);
+	// 	pub struct ThreadState {
+	// 	thread_id: ThreadId,
+	// 	threads_io: Arc<SharedIOContainer>,
+	// 	files: FileStateContainer,
+	// 	canonical_home: PathBuf,
+	// 	pub current_file_loc: Option<PathBuf>,
+	// }
 
-		let canonical_path = path.canonicalize()?;
+	pub fn file_open(&mut self, path: &str) -> Result<PathBuf, Box<dyn Error>> {
+		// Check whether a file is currently open
+		if let Some(pathbuf) = self.current_file_loc.clone() {
+			// File already open, remove bookkeeping
+			self.remove_file_bookkeeping(&pathbuf)?;
+			self.current_file_loc = None;
+		}
+
+		let canonical_path = Path::new(path).canonicalize()?;
 
 		// Check that path is valid given client home
 		if !canonical_path.starts_with(self.canonical_home()) {
@@ -193,6 +211,9 @@ impl ThreadState {
 			self.current_file_loc.as_ref().ok_or("No file opened")?,
 			|m| m.insert_at(offset, data),
 		)
+
+		// Iterate through clients editing the file
+		// If the client isn't self, send an update packet to them through their socket
 	}
 
 	pub fn file_save(&self) -> Result<(), Box<dyn Error>> {
