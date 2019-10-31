@@ -223,7 +223,6 @@ impl ThreadState {
 
 		// Iterate through clients editing the file
 		// If the client isn't self, send an update packet to them through their socket
-
 		self.file_state_read_op(
 			self.current_file_loc.as_ref().ok_or("No file opened")?,
 			|s| {
@@ -232,7 +231,32 @@ impl ThreadState {
 						continue;
 					}
 					self.threads_io
-						.socket_write(*c, &Message::make_broadcast(offset, data).to_vec()?)?;
+						.socket_write(*c, &Message::make_add_broadcast(offset, data).to_vec()?)?;
+				}
+				Ok(())
+			},
+		)?;
+
+		Ok(())
+	}
+
+	pub fn file_delete(&self, offset: usize, len: usize) -> Result<(), Box<dyn Error>> {
+		self.file_state_read_op(
+			self.current_file_loc.as_ref().ok_or("No file opened")?,
+			|s| s.remove_range(offset, offset + len),
+		)?;
+
+		// Iterate through clients editing the file
+		// If the client isn't self, send an update packet to them through their socket
+		self.file_state_read_op(
+			self.current_file_loc.as_ref().ok_or("No file opened")?,
+			|s| {
+				for c in s.clients.iter() {
+					if c == &self.thread_id {
+						continue;
+					}
+					self.threads_io
+						.socket_write(*c, &Message::make_del_broadcast(offset, len).to_vec()?)?;
 				}
 				Ok(())
 			},
