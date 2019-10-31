@@ -3,7 +3,7 @@ use std::io::{BufReader, BufWriter, Read, Write};
 use std::net::TcpStream;
 use std::sync::{Mutex, MutexGuard};
 
-pub struct ThreadIO {
+pub(super) struct ThreadIO {
 	stream: Mutex<IOBuffers>,
 }
 
@@ -23,7 +23,7 @@ impl ThreadIO {
 	}
 }
 
-pub struct IOBuffers {
+pub(super) struct IOBuffers {
 	reader: BufReader<TcpStream>,
 	writer: BufWriter<TcpStream>,
 }

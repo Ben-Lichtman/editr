@@ -1,10 +1,12 @@
+mod thread_io;
+
 use std::collections::HashMap;
 use std::error::Error;
 use std::net::TcpStream;
 use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::thread::ThreadId;
 
-use super::thread_io::ThreadIO;
+use self::thread_io::ThreadIO;
 
 #[derive(Default)]
 pub struct SharedIOContainer {
