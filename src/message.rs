@@ -1,6 +1,9 @@
+use std::error::Error;
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
+
+use serde_json;
 
 use crate::state::ThreadState;
 
@@ -69,34 +72,50 @@ pub enum Message {
 	SaveResp(SaveResult),
 }
 
-// Takes a message and the current client's state, processes it, and returns a message to reply with
-pub fn process_message(thread_local: &mut ThreadState, msg: Message) -> (Message, bool) {
-	match msg {
-		Message::Echo(inner) => (Message::Echo(inner), false),
-		Message::CreateReq(inner) => match thread_local.file_create(&inner) {
-			Ok(_) => (Message::CreateResp(CreateResult::Ok), false),
-			Err(e) => (Message::CreateResp(CreateResult::Err(e.to_string())), false),
-		},
-		Message::OpenReq(inner) => match thread_local.file_open(&inner) {
-			Ok(p) => (Message::OpenResp(OpenResult::Ok(p)), false),
-			Err(e) => (Message::OpenResp(OpenResult::Err(e.to_string())), false),
-		},
-		Message::WriteReq(inner) => match thread_local.file_write(inner.offset, &inner.data) {
-			Ok(_) => (Message::WriteResp(WriteResult::Ok), false),
-			Err(e) => (Message::WriteResp(WriteResult::Err(e.to_string())), false),
-		},
-		Message::ReadReq(inner) => {
-			let read_from = inner.offset;
-			let read_to = inner.offset + inner.len;
-			match thread_local.file_read(read_from, read_to) {
-				Ok(data) => (Message::ReadResp(ReadResult::Ok(data)), false),
-				Err(e) => (Message::ReadResp(ReadResult::Err(e.to_string())), false),
+impl Message {
+	pub fn from_slice(slice: &[u8]) -> Result<Message, Box<dyn Error>> {
+		Ok(serde_json::from_slice(slice).map_err(|e| e.to_string())?)
+	}
+
+	pub fn make_broadcast(offset: usize, data: &[u8]) -> Message {
+		Message::UpdateMessage(UpdateData {
+			offset,
+			data: Vec::from(data),
+		})
+	}
+
+	pub fn process(self, thread_local: &mut ThreadState) -> (Message, bool) {
+		match self {
+			Message::Echo(inner) => (Message::Echo(inner), false),
+			Message::CreateReq(inner) => match thread_local.file_create(&inner) {
+				Ok(_) => (Message::CreateResp(CreateResult::Ok), false),
+				Err(e) => (Message::CreateResp(CreateResult::Err(e.to_string())), false),
+			},
+			Message::OpenReq(inner) => match thread_local.file_open(&inner) {
+				Ok(p) => (Message::OpenResp(OpenResult::Ok(p)), false),
+				Err(e) => (Message::OpenResp(OpenResult::Err(e.to_string())), false),
+			},
+			Message::WriteReq(inner) => match thread_local.file_write(inner.offset, &inner.data) {
+				Ok(_) => (Message::WriteResp(WriteResult::Ok), false),
+				Err(e) => (Message::WriteResp(WriteResult::Err(e.to_string())), false),
+			},
+			Message::ReadReq(inner) => {
+				let read_from = inner.offset;
+				let read_to = inner.offset + inner.len;
+				match thread_local.file_read(read_from, read_to) {
+					Ok(data) => (Message::ReadResp(ReadResult::Ok(data)), false),
+					Err(e) => (Message::ReadResp(ReadResult::Err(e.to_string())), false),
+				}
 			}
+			Message::SaveReq => match thread_local.file_save() {
+				Ok(_) => (Message::SaveResp(SaveResult::Ok), false),
+				Err(e) => (Message::SaveResp(SaveResult::Err(e.to_string())), false),
+			},
+			_ => (Message::Invalid, true),
 		}
-		Message::SaveReq => match thread_local.file_save() {
-			Ok(_) => (Message::SaveResp(SaveResult::Ok), false),
-			Err(e) => (Message::SaveResp(SaveResult::Err(e.to_string())), false),
-		},
-		_ => (Message::Invalid, true),
+	}
+
+	pub fn to_vec(&self) -> Result<Vec<u8>, Box<dyn Error>> {
+		Ok(serde_json::to_vec(self).map_err(|e| e.to_string())?)
 	}
 }

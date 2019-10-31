@@ -5,9 +5,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use std::thread::spawn;
 
-use serde_json;
-
-use crate::message::{process_message, Message};
+use crate::message::Message;
 use crate::state::{shared_io_container::SharedIOContainer, FileState, ThreadState};
 
 const MAX_MESSAGE: usize = 1024;
@@ -23,11 +21,11 @@ fn client_thread(thread_local: &mut ThreadState) -> Result<(), Box<dyn Error>> {
 			break;
 		}
 
-		let msg: Message = serde_json::from_slice(&buffer[..num_read])?;
+		let msg = Message::from_slice(&buffer[..num_read])?;
 
-		let (response, exit) = process_message(thread_local, msg);
+		let (response, exit) = msg.process(thread_local);
 
-		let response_raw = serde_json::to_vec(&response)?;
+		let response_raw = response.to_vec()?;
 
 		let num_written = thread_local.socket_write(&response_raw)?;
 
