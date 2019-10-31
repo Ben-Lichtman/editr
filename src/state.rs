@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::thread::{current, ThreadId};
 
+use crate::message::Message;
 use crate::rope::Rope;
 use crate::state::shared_io_container::SharedIOContainer;
 
@@ -218,10 +219,26 @@ impl ThreadState {
 		self.file_state_read_op(
 			self.current_file_loc.as_ref().ok_or("No file opened")?,
 			|s| s.insert_at(offset, data),
-		)
+		)?;
 
 		// Iterate through clients editing the file
 		// If the client isn't self, send an update packet to them through their socket
+
+		self.file_state_read_op(
+			self.current_file_loc.as_ref().ok_or("No file opened")?,
+			|s| {
+				for c in s.clients.iter() {
+					if c == &self.thread_id {
+						continue;
+					}
+					self.threads_io
+						.socket_write(*c, &Message::make_broadcast(offset, data).to_vec()?)?;
+				}
+				Ok(())
+			},
+		)?;
+
+		Ok(())
 	}
 
 	pub fn file_save(&self) -> Result<(), Box<dyn Error>> {
