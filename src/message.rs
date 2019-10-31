@@ -32,9 +32,21 @@ pub enum WriteResult {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct UpdateData {
+pub struct UpdateAdd {
 	offset: usize,
 	data: Vec<u8>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct UpdateRemove {
+	offset: usize,
+	len: usize,
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum UpdateData {
+	Add(UpdateAdd),
+	Remove(UpdateRemove),
 }
 
 #[derive(Serialize, Deserialize)]
@@ -46,6 +58,18 @@ pub struct ReadReqData {
 #[derive(Serialize, Deserialize)]
 pub enum ReadResult {
 	Ok(Vec<u8>),
+	Err(String),
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct DeleteReqData {
+	offset: usize,
+	len: usize,
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum DeleteResult {
+	Ok,
 	Err(String),
 }
 
@@ -68,6 +92,8 @@ pub enum Message {
 	UpdateMessage(UpdateData),
 	ReadReq(ReadReqData),
 	ReadResp(ReadResult),
+	DeleteReq(DeleteReqData),
+	DeleteResp(DeleteResult),
 	SaveReq,
 	SaveResp(SaveResult),
 }
@@ -77,11 +103,15 @@ impl Message {
 		Ok(serde_json::from_slice(slice).map_err(|e| e.to_string())?)
 	}
 
-	pub fn make_broadcast(offset: usize, data: &[u8]) -> Message {
-		Message::UpdateMessage(UpdateData {
+	pub fn make_add_broadcast(offset: usize, data: &[u8]) -> Message {
+		Message::UpdateMessage(UpdateData::Add(UpdateAdd {
 			offset,
 			data: Vec::from(data),
-		})
+		}))
+	}
+
+	pub fn make_del_broadcast(offset: usize, len: usize) -> Message {
+		Message::UpdateMessage(UpdateData::Remove(UpdateRemove { offset, len }))
 	}
 
 	pub fn process(self, thread_local: &mut ThreadState) -> (Message, bool) {
@@ -107,6 +137,10 @@ impl Message {
 					Err(e) => (Message::ReadResp(ReadResult::Err(e.to_string())), false),
 				}
 			}
+			Message::DeleteReq(inner) => match thread_local.file_delete(inner.offset, inner.len) {
+				Ok(_) => (Message::DeleteResp(DeleteResult::Ok), false),
+				Err(e) => (Message::DeleteResp(DeleteResult::Err(e.to_string())), false),
+			},
 			Message::SaveReq => match thread_local.file_save() {
 				Ok(_) => (Message::SaveResp(SaveResult::Ok), false),
 				Err(e) => (Message::SaveResp(SaveResult::Err(e.to_string())), false),
