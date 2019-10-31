@@ -110,7 +110,18 @@ impl ThreadState {
 		self.file_state_write_op(key, |m| {
 			m.clients.remove(&self.thread_id);
 			Ok(())
-		})
+		})?;
+
+		// Check if the hashset of clients for this file is empty
+		if self.file_state_read_op(key, |s| Ok(s.len()? == 0))? {
+			// Remove file from hashmap
+			self.file_hashmap_write_op(|mut m| {
+				m.remove(key);
+				Ok(())
+			})?;
+		}
+
+		Ok(())
 	}
 
 	pub fn canonical_home(&self) -> &PathBuf { &self.canonical_home }
@@ -134,11 +145,11 @@ impl ThreadState {
 	}
 
 	pub fn insert_thread_io(&mut self, stream: TcpStream) -> Result<(), Box<dyn Error>> {
-		self.threads_io.insert(&self.thread_id, stream)
+		self.threads_io.insert(self.thread_id, stream)
 	}
 
 	pub fn remove_thread_io(&mut self) -> Result<(), Box<dyn Error>> {
-		self.threads_io.remove(&self.thread_id)
+		self.threads_io.remove(self.thread_id)
 	}
 
 	pub fn file_create(&self, path: &str) -> Result<(), Box<dyn Error>> {
@@ -184,11 +195,11 @@ impl ThreadState {
 	}
 
 	pub fn socket_read(&self, buffer: &mut [u8]) -> Result<usize, Box<dyn Error>> {
-		self.threads_io.socket_read(&self.thread_id, buffer)
+		self.threads_io.socket_read(self.thread_id, buffer)
 	}
 
 	pub fn socket_write(&self, buffer: &[u8]) -> Result<usize, Box<dyn Error>> {
-		self.threads_io.socket_write(&self.thread_id, buffer)
+		self.threads_io.socket_write(self.thread_id, buffer)
 	}
 
 	pub fn file_read(&self, from: usize, to: usize) -> Result<Vec<u8>, Box<dyn Error>> {

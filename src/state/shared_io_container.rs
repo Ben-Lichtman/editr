@@ -6,6 +6,7 @@ use std::thread::ThreadId;
 
 use super::thread_io::ThreadIO;
 
+#[derive(Default)]
 pub struct SharedIOContainer {
 	shared_io: RwLock<HashMap<ThreadId, ThreadIO>>,
 }
@@ -19,17 +20,17 @@ impl SharedIOContainer {
 	}
 
 	// Inserts a new stream
-	pub fn insert(&self, thread_id: &ThreadId, stream: TcpStream) -> Result<(), Box<dyn Error>> {
+	pub fn insert(&self, thread_id: ThreadId, stream: TcpStream) -> Result<(), Box<dyn Error>> {
 		self.write_op(|mut container| {
-			container.insert(thread_id.clone(), ThreadIO::new(stream));
+			container.insert(thread_id, ThreadIO::new(stream));
 			Ok(())
 		})
 	}
 
 	// Removes thread_id's stream
-	pub fn remove(&self, thread_id: &ThreadId) -> Result<(), Box<dyn Error>> {
+	pub fn remove(&self, thread_id: ThreadId) -> Result<(), Box<dyn Error>> {
 		self.write_op(|mut container| {
-			container.remove(thread_id);
+			container.remove(&thread_id);
 			Ok(())
 		})
 	}
@@ -38,7 +39,7 @@ impl SharedIOContainer {
 	// places read data into buffer
 	pub fn socket_read(
 		&self,
-		thread_id: &ThreadId,
+		thread_id: ThreadId,
 		buffer: &mut [u8],
 	) -> Result<usize, Box<dyn Error>> {
 		self.thread_io_op(thread_id, |io| io.apply(|mut stream| stream.read(buffer)))
@@ -48,7 +49,7 @@ impl SharedIOContainer {
 	// places read data into buffer
 	pub fn socket_write(
 		&self,
-		thread_id: &ThreadId,
+		thread_id: ThreadId,
 		buffer: &[u8],
 	) -> Result<usize, Box<dyn Error>> {
 		self.thread_io_op(thread_id, |io| io.apply(|mut stream| stream.write(buffer)))
@@ -81,7 +82,7 @@ impl SharedIOContainer {
 	// Performs an operation on ThreadIO object belonging to id
 	fn thread_io_op<T, F: FnOnce(&ThreadIO) -> Result<T, Box<dyn Error>>>(
 		&self,
-		id: &ThreadId,
+		id: ThreadId,
 		op: F,
 	) -> Result<T, Box<dyn Error>> {
 		self.read_op(|container| {
