@@ -106,7 +106,7 @@ impl ThreadState {
 		})
 	}
 
-	pub fn remove_file_bookkeeping(&mut self, key: &PathBuf) -> Result<(), Box<dyn Error>> {
+	fn remove_file_bookkeeping(&mut self, key: &PathBuf) -> Result<(), Box<dyn Error>> {
 		self.file_state_write_op(key, |m| {
 			m.clients.remove(&self.thread_id);
 			Ok(())
@@ -158,12 +158,7 @@ impl ThreadState {
 	}
 
 	pub fn file_open(&mut self, path: &str) -> Result<PathBuf, Box<dyn Error>> {
-		// Check whether a file is currently open
-		if let Some(pathbuf) = self.current_file_loc.clone() {
-			// File already open, remove bookkeeping
-			self.remove_file_bookkeeping(&pathbuf)?;
-			self.current_file_loc = None;
-		}
+		self.file_close()?;
 
 		let canonical_path = Path::new(path).canonicalize()?;
 
@@ -192,6 +187,16 @@ impl ThreadState {
 		self.current_file_loc = Some(canonical_path.clone());
 
 		Ok(canonical_path)
+	}
+
+	pub fn file_close(&mut self) -> Result<(), Box<dyn Error>> {
+		// Check whether a file is currently open
+		if let Some(pathbuf) = self.current_file_loc.clone() {
+			// File already open, remove bookkeeping
+			self.remove_file_bookkeeping(&pathbuf)?;
+			self.current_file_loc = None;
+		}
+		Ok(())
 	}
 
 	pub fn socket_read(&self, buffer: &mut [u8]) -> Result<usize, Box<dyn Error>> {

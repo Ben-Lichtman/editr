@@ -75,10 +75,8 @@ pub fn start<A: ToSocketAddrs>(path: &Path, address: A) -> Result<(), Box<dyn Er
 
 			client_thread(&mut thread_local).unwrap();
 
-			// If a file is open, remove bookkeeping
-			if let Some(pathbuf) = thread_local.current_file_loc.clone() {
-				thread_local.remove_file_bookkeeping(&pathbuf).unwrap();
-			}
+			// Close file
+			thread_local.file_close().unwrap();
 
 			// Remove io
 			thread_local.remove_thread_io().unwrap();
