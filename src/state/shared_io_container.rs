@@ -41,7 +41,7 @@ impl SharedIOContainer {
 	// places read data into buffer
 	pub fn socket_read(
 		&self,
-		thread_id: ThreadId,
+		thread_id: &ThreadId,
 		buffer: &mut [u8],
 	) -> Result<usize, Box<dyn Error>> {
 		self.thread_io_op(thread_id, |io| io.apply(|mut stream| stream.read(buffer)))
@@ -51,7 +51,7 @@ impl SharedIOContainer {
 	// places read data into buffer
 	pub fn socket_write(
 		&self,
-		thread_id: ThreadId,
+		thread_id: &ThreadId,
 		buffer: &[u8],
 	) -> Result<usize, Box<dyn Error>> {
 		self.thread_io_op(thread_id, |io| io.apply(|mut stream| stream.write(buffer)))
@@ -84,12 +84,12 @@ impl SharedIOContainer {
 	// Performs an operation on ThreadIO object belonging to id
 	fn thread_io_op<T, F: FnOnce(&ThreadIO) -> Result<T, Box<dyn Error>>>(
 		&self,
-		id: ThreadId,
+		id: &ThreadId,
 		op: F,
 	) -> Result<T, Box<dyn Error>> {
 		self.read_op(|container| {
 			op(container
-				.get(&id)
+				.get(id)
 				.ok_or("Thread local storage does not exist")?)
 		})
 	}
