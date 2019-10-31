@@ -4,7 +4,7 @@ mod thread_io;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fs::{File, OpenOptions};
-use std::io::Read;
+use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
@@ -100,15 +100,15 @@ impl ThreadState {
 	}
 
 	fn add_file_bookkeeping(&mut self, key: &PathBuf) -> Result<(), Box<dyn Error>> {
-		self.file_state_write_op(key, |m| {
-			m.clients.insert(self.thread_id);
+		self.file_state_write_op(key, |s| {
+			s.clients.insert(self.thread_id);
 			Ok(())
 		})
 	}
 
 	fn remove_file_bookkeeping(&mut self, key: &PathBuf) -> Result<(), Box<dyn Error>> {
-		self.file_state_write_op(key, |m| {
-			m.clients.remove(&self.thread_id);
+		self.file_state_write_op(key, |s| {
+			s.clients.remove(&self.thread_id);
 			Ok(())
 		})?;
 
@@ -153,7 +153,7 @@ impl ThreadState {
 	}
 
 	pub fn file_create(&self, path: &str) -> Result<(), Box<dyn Error>> {
-		OpenOptions::new().create(true).open(path)?;
+		OpenOptions::new().write(true).create_new(true).open(path)?;
 		Ok(())
 	}
 
@@ -210,14 +210,14 @@ impl ThreadState {
 	pub fn file_read(&self, from: usize, to: usize) -> Result<Vec<u8>, Box<dyn Error>> {
 		self.file_state_read_op(
 			self.current_file_loc.as_ref().ok_or("No file opened")?,
-			|m| m.collect(from, to),
+			|s| s.collect(from, to),
 		)
 	}
 
 	pub fn file_write(&self, offset: usize, data: &[u8]) -> Result<(), Box<dyn Error>> {
 		self.file_state_read_op(
 			self.current_file_loc.as_ref().ok_or("No file opened")?,
-			|m| m.insert_at(offset, data),
+			|s| s.insert_at(offset, data),
 		)
 
 		// Iterate through clients editing the file
@@ -227,7 +227,22 @@ impl ThreadState {
 	pub fn file_save(&self) -> Result<(), Box<dyn Error>> {
 		self.file_state_read_op(
 			self.current_file_loc.as_ref().ok_or("No file opened")?,
-			|m| m.flatten(),
-		)
+			|s| s.flatten(),
+		)?;
+
+		match self.current_file_loc.clone() {
+			Some(filepath) => {
+				let mut file = File::create(filepath)?;
+
+				let complete = self.file_state_read_op(
+					self.current_file_loc.as_ref().ok_or("No file opened")?,
+					|s| s.collect(0, s.len()?),
+				)?;
+
+				file.write_all(&complete)?;
+				Ok(())
+			}
+			None => Err("No file opened".into()),
+		}
 	}
 }
