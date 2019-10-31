@@ -200,11 +200,11 @@ impl ThreadState {
 	}
 
 	pub fn socket_read(&self, buffer: &mut [u8]) -> Result<usize, Box<dyn Error>> {
-		self.threads_io.socket_read(self.thread_id, buffer)
+		self.threads_io.socket_read(&self.thread_id, buffer)
 	}
 
 	pub fn socket_write(&self, buffer: &[u8]) -> Result<usize, Box<dyn Error>> {
-		self.threads_io.socket_write(self.thread_id, buffer)
+		self.threads_io.socket_write(&self.thread_id, buffer)
 	}
 
 	pub fn file_read(&self, from: usize, to: usize) -> Result<Vec<u8>, Box<dyn Error>> {
@@ -230,7 +230,7 @@ impl ThreadState {
 						continue;
 					}
 					self.threads_io
-						.socket_write(*c, &Message::make_add_broadcast(offset, data).to_vec()?)?;
+						.socket_write(c, &Message::make_add_broadcast(offset, data).to_vec()?)?;
 				}
 				Ok(())
 			},
@@ -255,7 +255,7 @@ impl ThreadState {
 						continue;
 					}
 					self.threads_io
-						.socket_write(*c, &Message::make_del_broadcast(offset, len).to_vec()?)?;
+						.socket_write(c, &Message::make_del_broadcast(offset, len).to_vec()?)?;
 				}
 				Ok(())
 			},
