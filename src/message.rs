@@ -97,6 +97,6 @@ pub fn process_message(thread_local: &mut ThreadState, msg: Message) -> (Message
 			Ok(_) => (Message::SaveResp(SaveResult::Ok), false),
 			Err(e) => (Message::SaveResp(SaveResult::Err(e.to_string())), false),
 		},
-		_ => (Message::Invalid, false),
+		_ => (Message::Invalid, true),
 	}
 }
