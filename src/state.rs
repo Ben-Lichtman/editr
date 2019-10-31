@@ -232,12 +232,9 @@ impl ThreadState {
 
 		match self.current_file_loc.clone() {
 			Some(filepath) => {
-				let mut file = File::create(filepath)?;
+				let mut file = File::create(&filepath)?;
 
-				let complete = self.file_state_read_op(
-					self.current_file_loc.as_ref().ok_or("No file opened")?,
-					|s| s.collect(0, s.len()?),
-				)?;
+				let complete = self.file_state_read_op(&filepath, |s| s.collect(0, s.len()?))?;
 
 				file.write_all(&complete)?;
 				Ok(())
