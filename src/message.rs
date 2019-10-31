@@ -5,18 +5,6 @@ use serde::{Deserialize, Serialize};
 use crate::state::ThreadState;
 
 #[derive(Serialize, Deserialize)]
-pub struct WriteReqData {
-	offset: usize,
-	data: Vec<u8>,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct ReadReqData {
-	offset: usize,
-	len: usize,
-}
-
-#[derive(Serialize, Deserialize)]
 pub enum CreateResult {
 	Ok,
 	Err(String),
@@ -29,9 +17,27 @@ pub enum OpenResult {
 }
 
 #[derive(Serialize, Deserialize)]
+pub struct WriteReqData {
+	offset: usize,
+	data: Vec<u8>,
+}
+
+#[derive(Serialize, Deserialize)]
 pub enum WriteResult {
 	Ok,
 	Err(String),
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct UpdateData {
+	offset: usize,
+	data: Vec<u8>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ReadReqData {
+	offset: usize,
+	len: usize,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -56,6 +62,7 @@ pub enum Message {
 	OpenResp(OpenResult),
 	WriteReq(WriteReqData),
 	WriteResp(WriteResult),
+	UpdateMessage(UpdateData),
 	ReadReq(ReadReqData),
 	ReadResp(ReadResult),
 	SaveReq,
