@@ -146,14 +146,6 @@ impl ThreadState {
 		Ok(())
 	}
 
-	// 	pub struct ThreadState {
-	// 	thread_id: ThreadId,
-	// 	threads_io: Arc<SharedIOContainer>,
-	// 	files: FileStateContainer,
-	// 	canonical_home: PathBuf,
-	// 	pub current_file_loc: Option<PathBuf>,
-	// }
-
 	pub fn file_open(&mut self, path: &str) -> Result<PathBuf, Box<dyn Error>> {
 		// Check whether a file is currently open
 		if let Some(pathbuf) = self.current_file_loc.clone() {
