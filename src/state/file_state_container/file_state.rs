@@ -24,13 +24,13 @@ impl FileState {
 
 	// Inserts a new client by their ThreadId
 	pub fn add_client(&self, id: &ThreadId) -> Result<(), Box<dyn Error>> {
-		self.clients_op(|clients| clients.insert(id))?;
+		self.clients_op(|mut clients| clients.insert(id))?;
 		Ok(())
 	}
 
 	// Removes a client by their ThreadId
 	pub fn remove_client(&self, id: &ThreadId) -> Result<(), Box<dyn Error>> {
-		self.clients_op(|clients| clients.remove(id))?;
+		self.clients_op(|mut clients| clients.remove(id))?;
 		Ok(())
 	}
 
