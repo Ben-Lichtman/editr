@@ -49,6 +49,11 @@ impl FileState {
 		self.rope.insert_at(offset, data)
 	}
 
+	// Deletes from the file, starting from offset
+	pub fn delete(&self, offset: usize, len: usize) Result<(), Box<dyn Error>> {
+		self.rope.remove_range(offset, offset + len)
+	}
+
 	// Locks clients and applies op
 	fn clients_op<
 		T,
