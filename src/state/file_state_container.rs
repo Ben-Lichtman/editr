@@ -53,6 +53,15 @@ impl FileStateContainer {
 		}
 	}
 
+	// Reads from the file at path starting from 'from' and ending at 'to'
+	pub fn file_read(&self, path: &PathBuf, from: usize, to: usize) -> Result<Vec<u8>, Box<dyn Error>> {
+		self.state_op(path, |state| state.read(from, to))
+	}
+
+	pub fn file_write(&self, path: &PathBuf, offset: usize, data: &[u8]) -> Result<(), Box<dyn Error>> {
+		self.state_op(path, |state| state.write(offset, data))
+	}
+
 	//// Removes FileState at path
 	//pub fn remove(&self, path: &PathBuf) -> Result<(), Box<dyn Error>>{
 	//	self.write_op(|container| container.remove(path));

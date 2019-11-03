@@ -39,6 +39,16 @@ impl FileState {
 		self.clients_op(|clients| clients.is_empty())?
 	}
 
+	// Returns a vector of read bytes starting from 'from' and ending at 'to'
+	pub fn read(&self, from: usize, to: usize) -> Result<Vec<u8>, Box<dyn Error>> {
+		self.rope.collect(from, to)
+	}
+
+	// Writes bytes in data into the file at offset
+	pub fn write(&self, offset: usize, data: &[u8]) -> Result<(), Box<dyn Error>> {
+		self.rope.insert_at(offset, data)
+	}
+
 	// Locks clients and applies op
 	fn clients_op<
 		T,
