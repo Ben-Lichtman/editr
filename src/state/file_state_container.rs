@@ -24,22 +24,19 @@ impl FileStateContainer {
 
 	// Opens the file at path for the client.
 	// If the file isn't in container, it will be read in.
-	// TODO: Get rid of race on self.contains(path)
-	// e.g. thread A, B may overwrite each other if they both get past it
+	// TODO: Minimise write lock while avoiding race on insertion
 	pub fn file_open(&self, path: &PathBuf, id: &ThreadId) -> Result<(), Box<dyn Error>> {
 		// Read into container if not present
-		if !self.contains(path)? {
+		let container = self.write_lock();
+		if !container.contains_key(path)? {
 			let rope = read_to_rope(path)?;
-			let state = FileState::new(rope).add_client(id)?;
-			self.write_op(|container| {
-				container.insert(path, state)?;
-			})
+			let state = FileState::new(rope)?;
+			container.insert(path, state)?;
 		}
-		else {
-			self.state_op(path, |state| {
-				state.add_client(id)?;
-			})
-		}
+
+		self.state_op(path, |state| {
+			state.add_client(id)?;
+		})?;
 		Ok(())
 	}
 
@@ -47,9 +44,10 @@ impl FileStateContainer {
 	pub fn file_close(&self, path: &PathBuf, id: &ThreadId) -> Result<(), Box<dyn Error>> {
 		self.state_op(path, |state| state.remove_client(id)?;
 		// Remove file from container if there are no clients remaining
-		let container = self.write_lock();
+		let container = self.read_lock();
 		if let Some(state) = container.get(path) {
 			if state.no_clients()? {
+				let container = self.write_lock();
 				container.remove(path)
 			}
 		}
