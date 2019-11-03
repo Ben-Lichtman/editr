@@ -22,7 +22,7 @@ impl FileStateContainer {
 		self.read_op(|container| Ok(container.contains_key(path)))
 	}
 
-	// Opens a file at path for the client.
+	// Opens the file at path for the client.
 	// If the file isn't in container, it will be read in.
 	// TODO: Get rid of race on self.contains(path)
 	// e.g. thread A, B may overwrite each other if they both get past it
@@ -43,27 +43,35 @@ impl FileStateContainer {
 		Ok(())
 	}
 
-	//pub fn file_close(&self, path: &PathBuf, id: &ThreadId) -> Result<(), Box<dyn Error>> {
-	//	
+	// Closes the file at path for client.
+	pub fn file_close(&self, path: &PathBuf, id: &ThreadId) -> Result<(), Box<dyn Error>> {
+		self.state_op(path, |state| state.remove_client(id)?;
+		// Remove file from container if there are no clients remaining
+		let container = self.write_lock();
+		if let Some(state) = container.get(path) {
+			if state.no_clients()? {
+				container.remove(path)
+			}
+		}
+	}
+
+	//// Removes FileState at path
+	//pub fn remove(&self, path: &PathBuf) -> Result<(), Box<dyn Error>>{
+	//	self.write_op(|container| container.remove(path));
+	//	Ok(())
 	//}
 
-	// Removes FileState at path
-	pub fn remove(&self, path: &PathBuf) -> Result<(), Box<dyn Error>>{
-		self.write_op(|container| container.remove(path));
-		Ok(())
-	}
+	//// Adds a new client to the FileState at path
+	//fn add_client(&self, path: &PathBuf, id: &ThreadId) -> Result<(), Box<dyn Error>> {
+	//	self.state_op(path, |state| state.add_client(id));
+	//	Ok(())
+	//}
 
-	// Adds a new client to the FileState at path
-	pub fn add_client(&self, path: &PathBuf, id: &ThreadId) -> Result<(), Box<dyn Error>> {
-		self.state_op(path, |state| state.add_client(id));
-		Ok(())
-	}
-
-	// Removes client from FileState at path
-	pub fn add_client(&self, path: &PathBuf, id: &ThreadId) -> Result<(), Box<dyn Error>> {
-		self.state_op(path, |state| state.remove_client(id));
-		Ok(())
-	}
+	//// Removes client from FileState at path
+	//fn remove_client(&self, path: &PathBuf, id: &ThreadId) -> Result<(), Box<dyn Error>> {
+	//	self.state_op(path, |state| state.remove_client(id));
+	//	Ok(())
+	//}
 
 	// Applies an op that requires a read lock on the underlying container
 	fn read_op<
@@ -73,7 +81,7 @@ impl FileStateContainer {
 		&self,
 		op: F,
 	) -> Result<T, Box<dyn Error>> {
-		op(self.container.read().map_err(|e| e.to_string())?)
+		op(self.read_lock()?)
 	}
 
 	// Applies an op that requires a write lock on the underlying container
@@ -84,7 +92,17 @@ impl FileStateContainer {
 		&self,
 		op: F,
 	) -> Result<T, Box<dyn Error>> {
-		op(self.container.write().map_err(|e| e.to_string())?)
+		op(self.write_lock()?)
+	}
+
+	// Acquires a read lock on the underlying container
+	fn read_lock(&self) -> Result<T, Box<dyn Error>> {
+		self.container.read().map_err(|e| e.to_string())
+	}
+
+	// Acquires a write lock on the underlying container
+	fn write_lock(&self) -> Result<T, Box<dyn Error>> {
+		self.container.write().map_err(|e| e.to_string())
 	}
 
 	// Applies an op on path's FileState

@@ -34,6 +34,11 @@ impl FileState {
 		Ok(())
 	}
 
+	// Returns true if self doesn't have any clients
+	pub fn no_clients(&self) -> Result<bool, Box<dyn Error>>> {
+		self.clients_op(|clients| clients.is_empty())?
+	}
+
 	// Locks clients and applies op
 	fn clients_op<
 		T,
