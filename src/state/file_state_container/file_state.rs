@@ -1,8 +1,8 @@
-use std::error::Error;
 use std::collections::HashSet;
+use std::error::Error;
+use std::ops::Deref;
 use std::sync::{Mutex, MutexGuard};
 use std::thread::ThreadId;
-use std::ops::Deref;
 
 use crate::rope::Rope;
 
@@ -44,8 +44,7 @@ impl FileState {
 	}
 
 	// Calls a closure f on each client
-	pub fn for_each_client<F: Fn(&ThreadId)>(&self, f: F,
-	) -> Result<(), Box<dyn Error>> {
+	pub fn for_each_client<F: Fn(&ThreadId)>(&self, f: F) -> Result<(), Box<dyn Error>> {
 		self.clients_op(|clients| {
 			clients.iter().for_each(|id| f(id));
 			Ok(())
@@ -54,9 +53,7 @@ impl FileState {
 	}
 
 	// Locks clients and applies op
-	fn clients_op<
-		T,
-		F: FnOnce(MutexGuard<HashSet<ThreadId>>) -> Result<T, Box<dyn Error>>>(
+	fn clients_op<T, F: FnOnce(MutexGuard<HashSet<ThreadId>>) -> Result<T, Box<dyn Error>>>(
 		&self,
 		op: F,
 	) -> Result<T, Box<dyn Error>> {
