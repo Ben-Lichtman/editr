@@ -157,7 +157,7 @@ impl Message {
 				Ok(_) => (Message::DeleteResp(DeleteResult::Ok), false),
 				Err(e) => (Message::DeleteResp(DeleteResult::Err(e.to_string())), false),
 			},
-			Message::SaveReq => match thread_local.save() {
+			Message::SaveReq => match thread_local.flush() {
 				Ok(_) => (Message::SaveResp(SaveResult::Ok), false),
 				Err(e) => (Message::SaveResp(SaveResult::Err(e.to_string())), false),
 			},
