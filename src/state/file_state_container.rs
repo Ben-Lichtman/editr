@@ -1,10 +1,15 @@
+mod file_state;
+
+use std::error::Error;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+use std::thread::ThreadId;
 use std::fs::File;
 use std::io::Read;
 
 use crate::rope::Rope;
+use self::file_state::FileState;
 
 pub struct FileStateContainer {
 	container: RwLock<HashMap<PathBuf, FileState>>
@@ -25,65 +30,56 @@ impl FileStateContainer {
 	// Opens the file at path for the client.
 	// If the file isn't in container, it will be read in.
 	// TODO: Minimise write lock while avoiding race on insertion
-	pub fn file_open(&self, path: &PathBuf, id: &ThreadId) -> Result<(), Box<dyn Error>> {
+	pub fn open(&self, path: PathBuf, id: &ThreadId) -> Result<(), Box<dyn Error>> {
 		// Read into container if not present
-		let container = self.write_lock();
-		if !container.contains_key(path)? {
-			let rope = read_to_rope(path)?;
-			let state = FileState::new(rope)?;
-			container.insert(path, state)?;
+		let container = self.write_lock()?;
+		if !container.contains_key(&path) {
+			let rope = read_to_rope(&path)?;
+			container.insert(path.clone(), FileState::new(rope));
 		}
 
-		self.state_op(path, |state| {
-			state.add_client(id)?;
+		self.file_op(&path, |file| {
+			file.add_client(id)
 		})?;
 		Ok(())
 	}
 
 	// Closes the file at path for client.
-	pub fn file_close(&self, path: &PathBuf, id: &ThreadId) -> Result<(), Box<dyn Error>> {
-		self.state_op(path, |state| state.remove_client(id)?;
+	pub fn close(&self, path: &PathBuf, id: &ThreadId) -> Result<(), Box<dyn Error>> {
+		self.file_op(path, |file| file.remove_client(id))?;
 		// Remove file from container if there are no clients remaining
-		let container = self.read_lock();
+		let container = self.read_lock()?;
 		if let Some(state) = container.get(path) {
 			if state.no_clients()? {
-				let container = self.write_lock();
-				container.remove(path)
+				let container = self.write_lock()?;
+				container.remove(path);
 			}
 		}
+		Ok(())
 	}
 
 	// Reads from the file at path starting from 'from' and ending at 'to'
-	pub fn file_read(&self, path: &PathBuf, from: usize, to: usize) -> Result<Vec<u8>, Box<dyn Error>> {
-		self.state_op(path, |state| state.collect(from, to))
+	pub fn read(&self, path: &PathBuf, from: usize, to: usize) -> Result<Vec<u8>, Box<dyn Error>> {
+		self.file_op(path, |file| file.collect(from, to))
 	}
 
 	// Writes to file at path at offset
-	pub fn file_write(&self, path: &PathBuf, offset: usize, data: &[u8]) -> Result<(), Box<dyn Error>> {
-		self.state_op(path, |state| state.insert_at(offset, data))
+	pub fn write(&self, path: &PathBuf, offset: usize, data: &[u8]) -> Result<(), Box<dyn Error>> {
+		self.file_op(path, |file| file.insert_at(offset, data))
 	}
 
 	// Deletes from the file at path, starting from offset
-	pub fn file_delete(&self, path: &PathBuf, offset: usize, len: usize) -> Result<(), Box<dyn Error>> {
-		self.state_op(path, |state| state.remove_range(offset, offset + len))
+	pub fn delete(&self, path: &PathBuf, offset: usize, len: usize) -> Result<(), Box<dyn Error>> {
+		self.file_op(path, |file| file.remove_range(offset, offset + len))
 	}
-	//// Removes FileState at path
-	//pub fn remove(&self, path: &PathBuf) -> Result<(), Box<dyn Error>>{
-	//	self.write_op(|container| container.remove(path));
-	//	Ok(())
-	//}
 
-	//// Adds a new client to the FileState at path
-	//fn add_client(&self, path: &PathBuf, id: &ThreadId) -> Result<(), Box<dyn Error>> {
-	//	self.state_op(path, |state| state.add_client(id));
-	//	Ok(())
-	//}
-
-	//// Removes client from FileState at path
-	//fn remove_client(&self, path: &PathBuf, id: &ThreadId) -> Result<(), Box<dyn Error>> {
-	//	self.state_op(path, |state| state.remove_client(id));
-	//	Ok(())
-	//}
+	// Calls a closure f on each client in the file at path
+	pub fn for_each_client<F: Fn(&ThreadId)>(&self, path: &PathBuf, f: F
+	) -> Result<(), Box<dyn Error>> {
+		self.file_op(path, |file| {
+			file.for_each_client(|client| f(client))
+		})
+	}
 
 	// Applies an op that requires a read lock on the underlying container
 	fn read_op<
@@ -108,17 +104,17 @@ impl FileStateContainer {
 	}
 
 	// Acquires a read lock on the underlying container
-	fn read_lock(&self) -> Result<T, Box<dyn Error>> {
+	fn read_lock(&self) -> Result<RwLockReadGuard<HashMap<PathBuf, FileState>>, String> {
 		self.container.read().map_err(|e| e.to_string())
 	}
 
 	// Acquires a write lock on the underlying container
-	fn write_lock(&self) -> Result<T, Box<dyn Error>> {
+	fn write_lock(&self) -> Result<RwLockWriteGuard<HashMap<PathBuf, FileState>>, String> {
 		self.container.write().map_err(|e| e.to_string())
 	}
 
 	// Applies an op on path's FileState
-	fn state_op<
+	fn file_op<
 		T,
 		F: FnOnce(&FileState) -> Result<T, Box<dyn Error>>,
 	>(
@@ -137,10 +133,10 @@ impl FileStateContainer {
 // Loads contents of file at path into a Rope
 fn read_to_rope(path: &PathBuf) -> Result<Rope, Box<dyn Error>> {
 	let mut buffer = Vec::new();
-	let mut file = File::open(&canonical_path)?;
+	let mut file = File::open(&path)?;
 	file.read_to_end(&mut buffer)?;
 
 	let rope = Rope::new();
 	rope.insert_at(0, &buffer)?;
-	rope
+	Ok(rope)
 }
