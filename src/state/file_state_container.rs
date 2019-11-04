@@ -32,7 +32,7 @@ impl FileStateContainer {
 	// TODO: Minimise write lock while avoiding race on insertion
 	pub fn open(&self, path: PathBuf, id: &ThreadId) -> Result<(), Box<dyn Error>> {
 		// Read into container if not present
-		let container = self.write_lock()?;
+		let mut container = self.write_lock()?;
 		if !container.contains_key(&path) {
 			let rope = read_to_rope(&path)?;
 			container.insert(path.clone(), FileState::new(rope));
@@ -49,7 +49,7 @@ impl FileStateContainer {
 		let container = self.read_lock()?;
 		if let Some(state) = container.get(path) {
 			if state.no_clients()? {
-				let container = self.write_lock()?;
+				let mut container = self.write_lock()?;
 				container.remove(path);
 			}
 		}
@@ -77,17 +77,17 @@ impl FileStateContainer {
 			file.flatten()?;
 			file.collect(0, file.len()?)
 		})?;
-		File::create(&path)?.write_all(&rope);
+		File::create(&path)?.write_all(&rope)?;
 		Ok(())
 	}
 
 	// Calls a closure f on each client in the file at path
-	pub fn for_each_client<F: Fn(&ThreadId)>(
+	pub fn for_each_client<F: Fn(&ThreadId) -> Result<(), Box<dyn Error>>>(
 		&self,
 		path: &PathBuf,
 		f: F,
 	) -> Result<(), Box<dyn Error>> {
-		self.file_op(path, |file| file.for_each_client(|client| f(client)))
+		self.file_op(path, |file| file.for_each_client(|id| f(id)))
 	}
 
 	// Applies an op that requires a read lock on the underlying container

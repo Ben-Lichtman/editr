@@ -1,12 +1,13 @@
-use std::collections::HashMap;
 use std::error::Error;
 use std::net::{TcpListener, ToSocketAddrs};
-use std::path::{Path, PathBuf};
-use std::sync::{Arc, RwLock};
+use std::path::Path;
+use std::sync::Arc;
 use std::thread::spawn;
 
 use crate::message::Message;
-use crate::state::{shared_io_container::SharedIOContainer, FileState, ThreadState};
+use crate::state::{
+	file_state_container::FileStateContainer, shared_io_container::SharedIOContainer, ThreadState,
+};
 
 const MAX_MESSAGE: usize = 1024;
 
@@ -56,7 +57,7 @@ pub fn start<A: ToSocketAddrs>(path: &Path, address: A) -> Result<(), Box<dyn Er
 
 	let listener = TcpListener::bind(address)?;
 
-	let files: Arc<RwLock<HashMap<PathBuf, FileState>>> = Arc::new(RwLock::new(HashMap::new()));
+	let files: Arc<FileStateContainer> = Arc::new(FileStateContainer::new());
 
 	let threads_io: Arc<SharedIOContainer> = Arc::new(SharedIOContainer::new());
 

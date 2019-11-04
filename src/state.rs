@@ -1,52 +1,29 @@
+pub mod file_state_container;
 pub mod shared_io_container;
 
-use std::collections::{HashMap, HashSet};
 use std::error::Error;
-use std::fs::{File, OpenOptions};
-use std::io::{Read, Write};
+use std::fs::OpenOptions;
 use std::net::TcpStream;
-use std::ops::Deref;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use std::sync::Arc;
 use std::thread::{current, ThreadId};
 
+use self::file_state_container::FileStateContainer;
+use self::shared_io_container::SharedIOContainer;
 use crate::message::Message;
-use crate::rope::Rope;
-use crate::state::shared_io_container::SharedIOContainer;
-
-pub type FileStateContainer = Arc<RwLock<HashMap<PathBuf, FileState>>>;
-
-pub struct FileState {
-	rope: Rope,
-	clients: HashSet<ThreadId>,
-}
 
 pub struct ThreadState {
 	thread_id: ThreadId,
 	threads_io: Arc<SharedIOContainer>,
-	files: FileStateContainer,
+	files: Arc<FileStateContainer>,
 	canonical_home: PathBuf,
 	pub current_file_loc: Option<PathBuf>,
-}
-
-impl Deref for FileState {
-	type Target = Rope;
-	fn deref(&self) -> &Self::Target { &self.rope }
-}
-
-impl FileState {
-	pub fn new(rope: Rope) -> FileState {
-		FileState {
-			rope,
-			clients: HashSet::new(),
-		}
-	}
 }
 
 impl ThreadState {
 	pub fn new(
 		threads_io: Arc<SharedIOContainer>,
-		files: FileStateContainer,
+		files: Arc<FileStateContainer>,
 		canonical_home: PathBuf,
 	) -> ThreadState {
 		ThreadState {
@@ -58,90 +35,10 @@ impl ThreadState {
 		}
 	}
 
-	fn file_hashmap_read_op<
-		T,
-		F: FnOnce(RwLockReadGuard<HashMap<PathBuf, FileState>>) -> Result<T, Box<dyn Error>>,
-	>(
-		&self,
-		f: F,
-	) -> Result<T, Box<dyn Error>> {
-		f(self.files.read().map_err(|e| e.to_string())?)
-	}
-
-	fn file_hashmap_write_op<
-		T,
-		F: FnOnce(RwLockWriteGuard<HashMap<PathBuf, FileState>>) -> Result<T, Box<dyn Error>>,
-	>(
-		&self,
-		f: F,
-	) -> Result<T, Box<dyn Error>> {
-		f(self.files.write().map_err(|e| e.to_string())?)
-	}
-
-	fn file_state_read_op<T, F: FnOnce(&FileState) -> Result<T, Box<dyn Error>>>(
-		&self,
-		key: &PathBuf,
-		f: F,
-	) -> Result<T, Box<dyn Error>> {
-		self.file_hashmap_write_op(|m| {
-			f(m.get(key).ok_or("Thread local storage does not exist")?)
-		})
-	}
-
-	fn file_state_write_op<T, F: FnOnce(&mut FileState) -> Result<T, Box<dyn Error>>>(
-		&self,
-		key: &PathBuf,
-		f: F,
-	) -> Result<T, Box<dyn Error>> {
-		self.file_hashmap_write_op(|mut m| {
-			f(m.get_mut(key)
-				.ok_or("Thread local storage does not exist")?)
-		})
-	}
-
-	fn add_file_bookkeeping(&mut self, key: &PathBuf) -> Result<(), Box<dyn Error>> {
-		self.file_state_write_op(key, |s| {
-			s.clients.insert(self.thread_id);
-			Ok(())
-		})
-	}
-
-	fn remove_file_bookkeeping(&mut self, key: &PathBuf) -> Result<(), Box<dyn Error>> {
-		self.file_state_write_op(key, |s| {
-			s.clients.remove(&self.thread_id);
-			Ok(())
-		})?;
-
-		// Check if the hashset of clients for this file is empty
-		if self.file_state_read_op(key, |s| Ok(s.len()? == 0))? {
-			// Remove file from hashmap
-			self.file_hashmap_write_op(|mut m| {
-				m.remove(key);
-				Ok(())
-			})?;
-		}
-
-		Ok(())
-	}
-
 	pub fn canonical_home(&self) -> &PathBuf { &self.canonical_home }
 
-	pub fn contains_file(&self, key: &PathBuf) -> Result<bool, Box<dyn Error>> {
-		self.file_hashmap_read_op(|m| Ok(m.contains_key(key)))
-	}
-
-	pub fn insert_files(&mut self, key: PathBuf, val: FileState) -> Result<(), Box<dyn Error>> {
-		self.file_hashmap_write_op(|mut m| {
-			m.insert(key, val);
-			Ok(())
-		})
-	}
-
-	pub fn remove_files(&mut self, key: &PathBuf) -> Result<(), Box<dyn Error>> {
-		self.file_hashmap_write_op(|mut m| {
-			m.remove(key);
-			Ok(())
-		})
+	pub fn contains_file(&self, path: &PathBuf) -> Result<bool, Box<dyn Error>> {
+		self.files.contains(path)
 	}
 
 	pub fn insert_thread_io(&mut self, stream: TcpStream) -> Result<(), Box<dyn Error>> {
@@ -158,6 +55,7 @@ impl ThreadState {
 	}
 
 	pub fn file_open(&mut self, path: &str) -> Result<PathBuf, Box<dyn Error>> {
+		// (currently) clients can only have one file open
 		self.file_close()?;
 
 		let canonical_path = Path::new(path).canonicalize()?;
@@ -167,22 +65,7 @@ impl ThreadState {
 			return Err("Invalid file path".into());
 		}
 
-		// Make sure the files hashmap contains this file
-		if !self.contains_file(&canonical_path)? {
-			// Read file
-			let mut buffer = Vec::new();
-			let mut file = File::open(&canonical_path)?;
-			file.read_to_end(&mut buffer)?;
-
-			// Add to rope
-			let rope = Rope::new();
-			rope.insert_at(0, &buffer)?;
-
-			self.insert_files(canonical_path.clone(), FileState::new(rope))?;
-		}
-
-		// Add bookkeeping
-		self.add_file_bookkeeping(&canonical_path)?;
+		self.files.open(canonical_path.clone(), &self.thread_id)?;
 
 		self.current_file_loc = Some(canonical_path.clone());
 
@@ -191,9 +74,8 @@ impl ThreadState {
 
 	pub fn file_close(&mut self) -> Result<(), Box<dyn Error>> {
 		// Check whether a file is currently open
-		if let Some(pathbuf) = self.current_file_loc.clone() {
-			// File already open, remove bookkeeping
-			self.remove_file_bookkeeping(&pathbuf)?;
+		if let Some(path) = &self.current_file_loc {
+			self.files.close(&path, &self.thread_id)?;
 			self.current_file_loc = None;
 		}
 		Ok(())
@@ -208,78 +90,39 @@ impl ThreadState {
 	}
 
 	pub fn file_read(&self, from: usize, to: usize) -> Result<Vec<u8>, Box<dyn Error>> {
-		self.file_state_read_op(
-			self.current_file_loc.as_ref().ok_or("No file opened")?,
-			|s| s.collect(from, to),
-		)
+		self.files.read(self.file_loc()?, from, to)
 	}
 
 	pub fn file_write(&self, offset: usize, data: &[u8]) -> Result<(), Box<dyn Error>> {
-		self.file_state_read_op(
-			self.current_file_loc.as_ref().ok_or("No file opened")?,
-			|s| s.insert_at(offset, data),
-		)?;
-
-		// Iterate through clients editing the file
-		// If the client isn't self, send an update packet to them through their socket
-		self.file_state_read_op(
-			self.current_file_loc.as_ref().ok_or("No file opened")?,
-			|s| {
-				for c in s.clients.iter() {
-					if c == &self.thread_id {
-						continue;
-					}
-					self.threads_io
-						.socket_write(c, &Message::make_add_broadcast(offset, data).to_vec()?)?;
-				}
-				Ok(())
-			},
-		)?;
-
+		self.files.write(self.file_loc()?, offset, data)?;
+		// Sync neigbours with the data just written
+		self.broadcast_neighbours(Message::make_add_broadcast(offset, data))?;
 		Ok(())
 	}
 
 	pub fn file_delete(&self, offset: usize, len: usize) -> Result<(), Box<dyn Error>> {
-		self.file_state_read_op(
-			self.current_file_loc.as_ref().ok_or("No file opened")?,
-			|s| s.remove_range(offset, offset + len),
-		)?;
-
-		// Iterate through clients editing the file
-		// If the client isn't self, send an update packet to them through their socket
-		self.file_state_read_op(
-			self.current_file_loc.as_ref().ok_or("No file opened")?,
-			|s| {
-				for c in s.clients.iter() {
-					if c == &self.thread_id {
-						continue;
-					}
-					self.threads_io
-						.socket_write(c, &Message::make_del_broadcast(offset, len).to_vec()?)?;
-				}
-				Ok(())
-			},
-		)?;
-
+		self.files.delete(self.file_loc()?, offset, len)?;
+		// Sync neighbours with deletion
+		self.broadcast_neighbours(Message::make_del_broadcast(offset, len))?;
 		Ok(())
 	}
 
-	pub fn file_save(&self) -> Result<(), Box<dyn Error>> {
-		self.file_state_read_op(
-			self.current_file_loc.as_ref().ok_or("No file opened")?,
-			|s| s.flatten(),
-		)?;
+	pub fn file_save(&self) -> Result<(), Box<dyn Error>> { self.files.flush(self.file_loc()?) }
 
-		match self.current_file_loc.clone() {
-			Some(filepath) => {
-				let mut file = File::create(&filepath)?;
+	// Returns client's current file path
+	fn file_loc(&self) -> Result<&PathBuf, &str> {
+		self.current_file_loc.as_ref().ok_or("No file opened")
+	}
 
-				let complete = self.file_state_read_op(&filepath, |s| s.collect(0, s.len()?))?;
-
-				file.write_all(&complete)?;
-				Ok(())
+	// Broadcasts a message to other clients in the same file as self
+	fn broadcast_neighbours(&self, msg: Message) -> Result<(), Box<dyn Error>> {
+		let data = msg.to_vec()?;
+		self.files.for_each_client(self.file_loc()?, |client| {
+			if client != &self.thread_id {
+				self.threads_io.socket_write(client, &data)?;
 			}
-			None => Err("No file opened".into()),
-		}
+			Ok(())
+		})?;
+		Ok(())
 	}
 }
