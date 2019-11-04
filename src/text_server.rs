@@ -6,7 +6,8 @@ use std::thread::spawn;
 
 use crate::message::Message;
 use crate::state::{
-	file_state_container::FileStateContainer, shared_io_container::SharedIOContainer, ThreadState,
+	file_state_container::FileStateContainer, shared_io_container::SharedIOContainer,
+	thread_state::ThreadState,
 };
 
 const MAX_MESSAGE: usize = 1024;
