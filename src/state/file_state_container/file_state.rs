@@ -11,8 +11,6 @@ pub(super) struct FileState {
 	clients: Mutex<HashSet<ThreadId>>,
 }
 
-//pub(super) type ClientsIter<'a> = hash_set::Iter<'a, ThreadId>;
-
 impl Deref for FileState {
 	type Target = Rope;
 	fn deref(&self) -> &Self::Target { &self.rope }
@@ -44,12 +42,16 @@ impl FileState {
 	}
 
 	// Calls a closure f on each client
-	pub fn for_each_client<F: Fn(&ThreadId)>(&self, f: F) -> Result<(), Box<dyn Error>> {
+	pub fn for_each_client<F: Fn(&ThreadId) -> Result<(), Box<dyn Error>>>(
+		&self,
+		f: F,
+	) -> Result<(), Box<dyn Error>> {
 		self.clients_op(|clients| {
-			clients.iter().for_each(|id| f(id));
+			for c in clients.iter() {
+				f(c)?;
+			}
 			Ok(())
-		})?;
-		Ok(())
+		})
 	}
 
 	// Locks clients and applies op
