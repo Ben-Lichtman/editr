@@ -1,18 +1,18 @@
 mod file_state;
 
-use std::error::Error;
 use std::collections::HashMap;
+use std::error::Error;
+use std::fs::File;
+use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::thread::ThreadId;
-use std::fs::File;
-use std::io::Read;
 
-use crate::rope::Rope;
 use self::file_state::FileState;
+use crate::rope::Rope;
 
 pub struct FileStateContainer {
-	container: RwLock<HashMap<PathBuf, FileState>>
+	container: RwLock<HashMap<PathBuf, FileState>>,
 }
 
 impl FileStateContainer {
@@ -23,7 +23,7 @@ impl FileStateContainer {
 	}
 
 	// True if container contains file at path
-	pub fn contains(&self, path: &PathBuf) ->Result<bool, Box<dyn Error>> {
+	pub fn contains(&self, path: &PathBuf) -> Result<bool, Box<dyn Error>> {
 		self.read_op(|container| Ok(container.contains_key(path)))
 	}
 
@@ -38,9 +38,7 @@ impl FileStateContainer {
 			container.insert(path.clone(), FileState::new(rope));
 		}
 
-		self.file_op(&path, |file| {
-			file.add_client(id)
-		})?;
+		self.file_op(&path, |file| file.add_client(id))?;
 		Ok(())
 	}
 
@@ -73,12 +71,23 @@ impl FileStateContainer {
 		self.file_op(path, |file| file.remove_range(offset, offset + len))
 	}
 
+	// Flushes file to disk
+	pub fn flush(&self, path: &PathBuf) -> Result<(), Box<dyn Error>> {
+		let rope = self.file_op(path, |file| {
+			file.flatten()?;
+			file.collect(0, file.len()?)
+		})?;
+		File::create(&path)?.write_all(&rope);
+		Ok(())
+	}
+
 	// Calls a closure f on each client in the file at path
-	pub fn for_each_client<F: Fn(&ThreadId)>(&self, path: &PathBuf, f: F
+	pub fn for_each_client<F: Fn(&ThreadId)>(
+		&self,
+		path: &PathBuf,
+		f: F,
 	) -> Result<(), Box<dyn Error>> {
-		self.file_op(path, |file| {
-			file.for_each_client(|client| f(client))
-		})
+		self.file_op(path, |file| file.for_each_client(|client| f(client)))
 	}
 
 	// Applies an op that requires a read lock on the underlying container
@@ -114,10 +123,7 @@ impl FileStateContainer {
 	}
 
 	// Applies an op on path's FileState
-	fn file_op<
-		T,
-		F: FnOnce(&FileState) -> Result<T, Box<dyn Error>>,
-	>(
+	fn file_op<T, F: FnOnce(&FileState) -> Result<T, Box<dyn Error>>>(
 		&self,
 		path: &PathBuf,
 		op: F,
