@@ -1,4 +1,5 @@
-pub mod message;
-pub mod rope;
-pub mod state;
 pub mod text_server;
+
+mod message;
+mod rope;
+mod state;

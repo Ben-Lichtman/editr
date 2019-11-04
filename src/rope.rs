@@ -276,11 +276,11 @@ impl Rope {
 		Ok(())
 	}
 
-	pub fn remove_range(&self, from: usize, size: usize) -> Result<(), Box<dyn Error>> {
+	pub fn remove(&self, from: usize, size: usize) -> Result<(), Box<dyn Error>> {
 		self.root
 			.write()
 			.map_err(|e| e.to_string())?
-			.remove_range(from, size);
+			.remove_range(from, from + size);
 		Ok(())
 	}
 

@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use serde_json;
 
-use crate::state::ThreadState;
+use crate::state::*;
 
 #[derive(Serialize, Deserialize)]
 pub enum CreateResult {
@@ -16,6 +16,12 @@ pub enum CreateResult {
 #[derive(Serialize, Deserialize)]
 pub enum OpenResult {
 	Ok(PathBuf),
+	Err(String),
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum CloseResult {
+	Ok,
 	Err(String),
 }
 
@@ -87,6 +93,8 @@ pub enum Message {
 	CreateResp(CreateResult),
 	OpenReq(String),
 	OpenResp(OpenResult),
+	CloseReq,
+	CloseResp(CloseResult),
 	WriteReq(WriteReqData),
 	WriteResp(WriteResult),
 	UpdateMessage(UpdateData),
@@ -114,34 +122,42 @@ impl Message {
 		Message::UpdateMessage(UpdateData::Remove(UpdateRemove { offset, len }))
 	}
 
-	pub fn process(self, thread_local: &mut ThreadState) -> (Message, bool) {
+	pub fn process(self, thread_local: &mut LocalState) -> (Message, bool) {
 		match self {
 			Message::Echo(inner) => (Message::Echo(inner), false),
-			Message::CreateReq(inner) => match thread_local.file_create(&inner) {
+			Message::CreateReq(inner) => match thread_local.create(&inner) {
 				Ok(_) => (Message::CreateResp(CreateResult::Ok), false),
 				Err(e) => (Message::CreateResp(CreateResult::Err(e.to_string())), false),
 			},
-			Message::OpenReq(inner) => match thread_local.file_open(&inner) {
+			Message::OpenReq(inner) => match thread_local.open(&inner) {
 				Ok(p) => (Message::OpenResp(OpenResult::Ok(p)), false),
 				Err(e) => (Message::OpenResp(OpenResult::Err(e.to_string())), false),
 			},
-			Message::WriteReq(inner) => match thread_local.file_write(inner.offset, &inner.data) {
+			Message::CloseReq => match thread_local.close() {
+				Ok(_) => (Message::CloseResp(CloseResult::Ok), false),
+				Err(e) => (Message::CloseResp(CloseResult::Err(e.to_string())), false),
+			},
+			Message::WriteReq(inner) => match thread_local.write(inner.offset, &inner.data) {
 				Ok(_) => (Message::WriteResp(WriteResult::Ok), false),
 				Err(e) => (Message::WriteResp(WriteResult::Err(e.to_string())), false),
 			},
 			Message::ReadReq(inner) => {
 				let read_from = inner.offset;
 				let read_to = inner.offset + inner.len;
-				match thread_local.file_read(read_from, read_to) {
+				match thread_local.file_state.read(
+					&thread_local.current_file_loc,
+					read_from,
+					read_to,
+				) {
 					Ok(data) => (Message::ReadResp(ReadResult::Ok(data)), false),
 					Err(e) => (Message::ReadResp(ReadResult::Err(e.to_string())), false),
 				}
 			}
-			Message::DeleteReq(inner) => match thread_local.file_delete(inner.offset, inner.len) {
+			Message::DeleteReq(inner) => match thread_local.delete(inner.offset, inner.len) {
 				Ok(_) => (Message::DeleteResp(DeleteResult::Ok), false),
 				Err(e) => (Message::DeleteResp(DeleteResult::Err(e.to_string())), false),
 			},
-			Message::SaveReq => match thread_local.file_save() {
+			Message::SaveReq => match thread_local.save() {
 				Ok(_) => (Message::SaveResp(SaveResult::Ok), false),
 				Err(e) => (Message::SaveResp(SaveResult::Err(e.to_string())), false),
 			},
