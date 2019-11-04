@@ -31,29 +31,31 @@ impl FileStateContainer {
 	// If the file isn't in container, it will be read in.
 	// TODO: Minimise write lock while avoiding race on insertion
 	pub fn open(&self, path: PathBuf, id: &ThreadId) -> Result<(), Box<dyn Error>> {
-		// Read into container if not present
-		let mut container = self.write_lock()?;
-		if !container.contains_key(&path) {
-			let rope = read_to_rope(&path)?;
-			container.insert(path.clone(), FileState::new(rope));
-		}
-
-		self.file_op(&path, |file| file.add_client(id))?;
-		Ok(())
+		self.write_op(|mut container| {
+			match container.get(&path) {
+				Some(file) => file.add_client(id)?,
+				// Read into container if not present
+				None => {
+					let rope = read_to_rope(&path)?;
+					container.insert(path.clone(), FileState::new(rope));
+				}
+			}
+			Ok(())
+		})
 	}
 
 	// Closes the file at path for client.
 	pub fn close(&self, path: &PathBuf, id: &ThreadId) -> Result<(), Box<dyn Error>> {
 		self.file_op(path, |file| file.remove_client(id))?;
 		// Remove file from container if there are no clients remaining
-		let container = self.read_lock()?;
-		if let Some(state) = container.get(path) {
-			if state.no_clients()? {
-				let mut container = self.write_lock()?;
-				container.remove(path);
+		self.write_op(|mut container| {
+			if let Some(state) = container.get(path) {
+				if state.no_clients()? {
+					container.remove(path);
+				}
 			}
-		}
-		Ok(())
+			Ok(())
+		})
 	}
 
 	// Reads from the file at path starting from 'from' and ending at 'to'
@@ -98,7 +100,7 @@ impl FileStateContainer {
 		&self,
 		op: F,
 	) -> Result<T, Box<dyn Error>> {
-		op(self.read_lock()?)
+		op(self.container.read().map_err(|e| e.to_string())?)
 	}
 
 	// Applies an op that requires a write lock on the underlying container
@@ -109,17 +111,7 @@ impl FileStateContainer {
 		&self,
 		op: F,
 	) -> Result<T, Box<dyn Error>> {
-		op(self.write_lock()?)
-	}
-
-	// Acquires a read lock on the underlying container
-	fn read_lock(&self) -> Result<RwLockReadGuard<HashMap<PathBuf, FileState>>, String> {
-		self.container.read().map_err(|e| e.to_string())
-	}
-
-	// Acquires a write lock on the underlying container
-	fn write_lock(&self) -> Result<RwLockWriteGuard<HashMap<PathBuf, FileState>>, String> {
-		self.container.write().map_err(|e| e.to_string())
+		op(self.container.write().map_err(|e| e.to_string())?)
 	}
 
 	// Applies an op on path's FileState
