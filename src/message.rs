@@ -7,6 +7,8 @@ use serde_json;
 
 use crate::state::*;
 
+type MessageResult<T> = Result<T, Box<dyn Error>>;
+
 #[derive(Serialize, Deserialize)]
 pub enum CreateResult {
 	Ok,
@@ -107,7 +109,7 @@ pub enum Message {
 }
 
 impl Message {
-	pub fn from_slice(slice: &[u8]) -> Result<Message, Box<dyn Error>> {
+	pub fn from_slice(slice: &[u8]) -> MessageResult<Message> {
 		Ok(serde_json::from_slice(slice).map_err(|e| e.to_string())?)
 	}
 
@@ -165,7 +167,7 @@ impl Message {
 		}
 	}
 
-	pub fn to_vec(&self) -> Result<Vec<u8>, Box<dyn Error>> {
+	pub fn to_vec(&self) -> MessageResult<Vec<u8>> {
 		Ok(serde_json::to_vec(self).map_err(|e| e.to_string())?)
 	}
 }

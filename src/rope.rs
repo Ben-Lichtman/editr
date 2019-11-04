@@ -2,6 +2,8 @@ use std::error::Error;
 use std::mem::replace;
 use std::sync::{Arc, RwLock};
 
+type RopeResult<T> = Result<T, Box<dyn Error>>;
+
 #[derive(Debug)]
 pub struct Rope {
 	root: Arc<RwLock<Node>>,
@@ -268,7 +270,7 @@ impl Rope {
 		}
 	}
 
-	pub fn insert_at(&self, index: usize, input: &[u8]) -> Result<(), Box<dyn Error>> {
+	pub fn insert_at(&self, index: usize, input: &[u8]) -> RopeResult<()> {
 		self.root
 			.write()
 			.map_err(|e| e.to_string())?
@@ -276,7 +278,7 @@ impl Rope {
 		Ok(())
 	}
 
-	pub fn remove(&self, from: usize, size: usize) -> Result<(), Box<dyn Error>> {
+	pub fn remove(&self, from: usize, size: usize) -> RopeResult<()> {
 		self.root
 			.write()
 			.map_err(|e| e.to_string())?
@@ -284,18 +286,18 @@ impl Rope {
 		Ok(())
 	}
 
-	pub fn len(&self) -> Result<usize, Box<dyn Error>> {
+	pub fn len(&self) -> RopeResult<usize> {
 		Ok(self.root.read().map_err(|e| e.to_string())?.size())
 	}
 
-	pub fn is_empty(&self) -> Result<bool, Box<dyn Error>> { Ok(self.len()? == 0) }
+	pub fn is_empty(&self) -> RopeResult<bool> { Ok(self.len()? == 0) }
 
-	pub fn flatten(&self) -> Result<(), Box<dyn Error>> {
+	pub fn flatten(&self) -> RopeResult<()> {
 		self.root.write().map_err(|e| e.to_string())?.flatten();
 		Ok(())
 	}
 
-	pub fn collect(&self, from: usize, to: usize) -> Result<Vec<u8>, Box<dyn Error>> {
+	pub fn collect(&self, from: usize, to: usize) -> RopeResult<Vec<u8>> {
 		let mut collection = Vec::new();
 		let mut counter = 0usize;
 
@@ -341,7 +343,7 @@ impl Rope {
 		Ok(collection)
 	}
 
-	pub fn search(&self, needle: u8) -> Result<Vec<usize>, Box<dyn Error>> {
+	pub fn search(&self, needle: u8) -> RopeResult<Vec<usize>> {
 		let mut matches = Vec::new();
 		let mut counter = 0usize;
 		for node in self
