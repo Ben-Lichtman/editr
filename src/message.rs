@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use serde_json;
 
-use crate::state::ThreadState;
+use crate::state::thread_state::ThreadState;
 
 #[derive(Serialize, Deserialize)]
 pub enum CreateResult {
