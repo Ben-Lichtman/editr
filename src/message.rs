@@ -80,6 +80,12 @@ pub enum SaveResult {
 }
 
 #[derive(Serialize, Deserialize)]
+pub enum FilesListResult {
+	Ok(Vec<String>),
+	Err(String),
+}
+
+#[derive(Serialize, Deserialize)]
 pub enum Message {
 	Invalid,
 	Echo(Vec<u8>),
@@ -96,6 +102,8 @@ pub enum Message {
 	DeleteResp(DeleteResult),
 	SaveReq,
 	SaveResp(SaveResult),
+	FilesListReq,
+	FilesListResp(FilesListResult),
 }
 
 impl Message {
@@ -144,6 +152,13 @@ impl Message {
 			Message::SaveReq => match thread_local.file_save() {
 				Ok(_) => (Message::SaveResp(SaveResult::Ok), false),
 				Err(e) => (Message::SaveResp(SaveResult::Err(e.to_string())), false),
+			},
+			Message::FilesListReq => match thread_local.files_list() {
+				Ok(list) => (Message::FilesListResp(FilesListResult::Ok(list)), false),
+				Err(e) => (
+					Message::FilesListResp(FilesListResult::Err(e.to_string())),
+					false,
+				),
 			},
 			_ => (Message::Invalid, true),
 		}

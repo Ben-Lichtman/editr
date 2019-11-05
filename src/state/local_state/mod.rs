@@ -41,6 +41,17 @@ impl LocalState {
 		Ok(())
 	}
 
+	// Returns a list of filenames in canonical_home as Strings.
+	pub fn files_list(&self) -> EditrResult<Vec<String>> {
+		let mut list = Vec::new();
+		for f in self.canonical_home.read_dir()? {
+			if let Some(name) = f?.file_name().into_string().ok() {
+				list.push(name);
+			}
+		}
+		Ok(list)
+	}
+
 	pub fn file_open(&mut self, path: &str) -> EditrResult<PathBuf> {
 		// (currently) clients can only have one file open
 		self.file_close()?;
