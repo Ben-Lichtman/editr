@@ -1,4 +1,4 @@
-use std::fs::OpenOptions;
+use std::fs::{self, OpenOptions};
 use std::net::TcpStream;
 use std::path::{Path, PathBuf};
 use std::thread::{current, ThreadId};
@@ -36,9 +36,22 @@ impl LocalState {
 
 	pub fn remove_thread_io(&mut self) -> EditrResult<()> { self.threads_io.remove(self.thread_id) }
 
+	// Creates a new file at path
 	pub fn file_create(&self, path: &str) -> EditrResult<()> {
 		OpenOptions::new().write(true).create_new(true).open(path)?;
 		Ok(())
+	}
+
+	// Deletes the file at path
+	pub fn file_delete(&self, path: &str) -> EditrResult<()> {
+		let path = Path::new(path).canonicalize()?;
+		match self.contains_file(&path)? {
+			false => {
+				fs::remove_file(path)?;
+				Ok(())
+			}
+			true => Err("File is busy".into()),
+		}
 	}
 
 	// Returns a list of filenames in canonical_home as Strings.

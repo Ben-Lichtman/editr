@@ -14,6 +14,12 @@ pub enum CreateResult {
 }
 
 #[derive(Serialize, Deserialize)]
+pub enum DeleteResult {
+	Ok,
+	Err(String),
+}
+
+#[derive(Serialize, Deserialize)]
 pub enum OpenResult {
 	Ok(PathBuf),
 	Err(String),
@@ -62,13 +68,13 @@ pub enum ReadResult {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct DeleteReqData {
+pub struct RemoveReqData {
 	offset: usize,
 	len: usize,
 }
 
 #[derive(Serialize, Deserialize)]
-pub enum DeleteResult {
+pub enum RemoveResult {
 	Ok,
 	Err(String),
 }
@@ -91,6 +97,8 @@ pub enum Message {
 	Echo(Vec<u8>),
 	CreateReq(String),
 	CreateResp(CreateResult),
+	DeleteReq(String),
+	DeleteResp(DeleteResult),
 	OpenReq(String),
 	OpenResp(OpenResult),
 	WriteReq(WriteReqData),
@@ -98,8 +106,8 @@ pub enum Message {
 	UpdateMessage(UpdateData),
 	ReadReq(ReadReqData),
 	ReadResp(ReadResult),
-	DeleteReq(DeleteReqData),
-	DeleteResp(DeleteResult),
+	RemoveReq(RemoveReqData),
+	RemoveResp(RemoveResult),
 	SaveReq,
 	SaveResp(SaveResult),
 	FilesListReq,
@@ -129,6 +137,10 @@ impl Message {
 				Ok(_) => (Message::CreateResp(CreateResult::Ok), false),
 				Err(e) => (Message::CreateResp(CreateResult::Err(e.to_string())), false),
 			},
+			Message::DeleteReq(inner) => match thread_local.file_delete(&inner) {
+				Ok(_) => (Message::DeleteResp(DeleteResult::Ok), false),
+				Err(e) => (Message::DeleteResp(DeleteResult::Err(e.to_string())), false),
+			},
 			Message::OpenReq(inner) => match thread_local.file_open(&inner) {
 				Ok(p) => (Message::OpenResp(OpenResult::Ok(p)), false),
 				Err(e) => (Message::OpenResp(OpenResult::Err(e.to_string())), false),
@@ -145,9 +157,9 @@ impl Message {
 					Err(e) => (Message::ReadResp(ReadResult::Err(e.to_string())), false),
 				}
 			}
-			Message::DeleteReq(inner) => match thread_local.file_delete(inner.offset, inner.len) {
-				Ok(_) => (Message::DeleteResp(DeleteResult::Ok), false),
-				Err(e) => (Message::DeleteResp(DeleteResult::Err(e.to_string())), false),
+			Message::RemoveReq(inner) => match thread_local.file_remove(inner.offset, inner.len) {
+				Ok(_) => (Message::RemoveResp(RemoveResult::Ok), false),
+				Err(e) => (Message::RemoveResp(RemoveResult::Err(e.to_string())), false),
 			},
 			Message::SaveReq => match thread_local.file_save() {
 				Ok(_) => (Message::SaveResp(SaveResult::Ok), false),
