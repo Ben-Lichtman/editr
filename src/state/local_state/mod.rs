@@ -62,7 +62,7 @@ impl LocalState {
 	pub fn file_close(&mut self) -> EditrResult<()> {
 		// Check whether a file is currently open
 		if let Some(path) = &self.opened_file {
-			self.files.close(&path, &self.thread_id)?;
+			self.files.close(&path, self.thread_id)?;
 			self.opened_file = None;
 		}
 		Ok(())
@@ -106,8 +106,8 @@ impl LocalState {
 	fn broadcast_neighbours(&self, msg: Message) -> EditrResult<()> {
 		let data = msg.to_vec()?;
 		self.files.for_each_client(self.get_opened()?, |client| {
-			if client != &self.thread_id {
-				self.threads_io.socket_write(client, &data)?;
+			if client != self.thread_id {
+				self.threads_io.write(client, &data)?;
 			}
 			Ok(())
 		})?;

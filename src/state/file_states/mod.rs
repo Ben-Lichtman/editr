@@ -5,21 +5,22 @@ use std::error::Error;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::PathBuf;
-use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::thread::ThreadId;
 
 use self::file_state::FileState;
 use crate::error::EditrResult;
 use crate::rope::Rope;
 
+#[derive(Clone)]
 pub struct FileStates {
-	container: RwLock<HashMap<PathBuf, FileState>>,
+	container: Arc<RwLock<HashMap<PathBuf, FileState>>>,
 }
 
 impl FileStates {
 	pub fn new() -> FileStates {
 		FileStates {
-			container: RwLock::new(HashMap::new()),
+			container: Arc::new(RwLock::new(HashMap::new())),
 		}
 	}
 
