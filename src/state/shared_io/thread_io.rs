@@ -1,48 +1,32 @@
-use std::error::Error;
 use std::io::{BufReader, BufWriter, Read, Write};
 use std::net::TcpStream;
-use std::sync::{Mutex, MutexGuard};
+use std::sync::Mutex;
 
-pub(super) struct ThreadIO {
-	stream: Mutex<IOBuffers>,
+use crate::error::EditrResult;
+
+pub struct ThreadIO {
+	reader: Mutex<BufReader<TcpStream>>,
+	writer: Mutex<BufWriter<TcpStream>>,
 }
 
 impl ThreadIO {
-	pub fn new(stream: TcpStream) -> ThreadIO {
-		ThreadIO {
-			stream: Mutex::new(IOBuffers::new(stream)),
-		}
-	}
+	pub fn new(stream: TcpStream) -> EditrResult<ThreadIO> {
+		let reader_copy = stream.try_clone()?;
+		let writer_copy = stream.try_clone()?;
 
-	// Locks stream and applies op
-	pub fn apply<T, F: FnOnce(MutexGuard<IOBuffers>) -> Result<T, Box<dyn Error>>>(
-		&self,
-		op: F,
-	) -> Result<T, Box<dyn Error>> {
-		op(self.stream.lock().map_err(|e| e.to_string())?)
-	}
-}
-
-pub(super) struct IOBuffers {
-	reader: BufReader<TcpStream>,
-	writer: BufWriter<TcpStream>,
-}
-
-impl IOBuffers {
-	pub fn new(stream: TcpStream) -> IOBuffers {
-		IOBuffers {
-			reader: BufReader::new(stream.try_clone().unwrap()),
-			writer: BufWriter::with_capacity(0, stream.try_clone().unwrap()),
-		}
+		Ok(ThreadIO {
+			reader: Mutex::new(BufReader::new(reader_copy)),
+			writer: Mutex::new(BufWriter::with_capacity(0, writer_copy)),
+		})
 	}
 
 	// Reads from reader into buffer
-	pub fn read(&mut self, buffer: &mut [u8]) -> Result<usize, Box<dyn Error>> {
-		Ok(self.reader.read(buffer)?)
+	pub fn read(&self, buf: &mut [u8]) -> EditrResult<usize> {
+		Ok(self.reader.lock().map_err(|e| e.to_string())?.read(buf)?)
 	}
 
 	// Writes from buffer into writer
-	pub fn write(&mut self, buffer: &[u8]) -> Result<usize, Box<dyn Error>> {
-		Ok(self.writer.write(buffer)?)
+	pub fn write(&self, buf: &[u8]) -> EditrResult<usize> {
+		Ok(self.writer.lock().map_err(|e| e.to_string())?.write(buf)?)
 	}
 }
