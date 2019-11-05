@@ -290,8 +290,6 @@ impl Rope {
 		Ok(self.root.read().map_err(|e| e.to_string())?.size())
 	}
 
-	pub fn is_empty(&self) -> RopeResult<bool> { Ok(self.len()? == 0) }
-
 	pub fn flatten(&self) -> RopeResult<()> {
 		self.root.write().map_err(|e| e.to_string())?.flatten();
 		Ok(())

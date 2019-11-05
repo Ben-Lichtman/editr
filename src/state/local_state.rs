@@ -87,16 +87,20 @@ impl LocalState {
 			.write(&self.current_file_loc, offset, data)?;
 
 		// Iterate all clients of the current file
-		for id in self.file_state.get_clients(&self.current_file_loc)? {
-			// Do not send data to self
-			if id == self.thread_id {
-				continue;
-			}
-			// Send update to client
-			self.shared_io
-				.write(id, &Message::make_add_broadcast(offset, data).to_vec()?)?;
-		}
-		Ok(())
+		self.file_state
+			.for_each_client(&self.current_file_loc, |(k, _)| {
+				// Do not send data to self
+				if *k == self.thread_id {
+					return;
+				}
+				// Send update to client
+				self.shared_io
+					.write(
+						*k,
+						&Message::make_add_broadcast(offset, data).to_vec().unwrap(),
+					)
+					.unwrap();
+			})
 	}
 
 	pub fn delete(&self, offset: usize, len: usize) -> LocalStateResult<()> {
@@ -104,16 +108,20 @@ impl LocalState {
 			.delete(&self.current_file_loc, offset, len)?;
 
 		// Iterate all clients of the current file
-		for id in self.file_state.get_clients(&self.current_file_loc)? {
-			// Do not send data to self
-			if id == self.thread_id {
-				continue;
-			}
-			// Send update to client
-			self.shared_io
-				.write(id, &Message::make_del_broadcast(offset, len).to_vec()?)?;
-		}
-		Ok(())
+		self.file_state
+			.for_each_client(&self.current_file_loc, |(k, _)| {
+				// Do not send data to self
+				if *k == self.thread_id {
+					return;
+				}
+				// Send update to client
+				self.shared_io
+					.write(
+						*k,
+						&Message::make_del_broadcast(offset, len).to_vec().unwrap(),
+					)
+					.unwrap();
+			})
 	}
 
 	pub fn flush(&mut self) -> LocalStateResult<()> {

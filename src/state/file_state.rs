@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::error::Error;
 use std::ops::Deref;
 use std::path::PathBuf;
@@ -9,9 +9,15 @@ use crate::rope::Rope;
 
 type FileStateResult<T> = Result<T, Box<dyn Error>>;
 
+pub struct ClientState {}
+
+impl ClientState {
+	fn new() -> ClientState { ClientState {} }
+}
+
 struct FileStateInner {
 	rope: Rope,
-	clients: Mutex<HashSet<ThreadId>>,
+	clients: Mutex<HashMap<ThreadId, ClientState>>,
 }
 
 impl Deref for FileStateInner {
@@ -24,13 +30,13 @@ impl FileStateInner {
 	fn new() -> FileStateInner {
 		FileStateInner {
 			rope: Rope::new(),
-			clients: Mutex::new(HashSet::new()),
+			clients: Mutex::new(HashMap::new()),
 		}
 	}
 
 	fn add_client(&self, id: ThreadId) -> FileStateResult<()> {
 		self.clients_op(|mut c| {
-			c.insert(id);
+			c.insert(id, ClientState::new());
 			Ok(())
 		})
 	}
@@ -42,13 +48,19 @@ impl FileStateInner {
 		})
 	}
 
-	fn get_clients(&self) -> FileStateResult<Vec<ThreadId>> {
-		self.clients_op(|c| Ok(c.iter().map(|i| *i).collect()))
+	fn for_each_client<F: FnMut((&ThreadId, &ClientState))>(&self, f: F) -> FileStateResult<()> {
+		self.clients_op(|c| {
+			c.iter().for_each(f);
+			Ok(())
+		})
 	}
 
 	fn no_clients(&self) -> FileStateResult<bool> { self.clients_op(|c| Ok(c.len() == 0)) }
 
-	fn clients_op<T, F: FnOnce(MutexGuard<HashSet<ThreadId>>) -> FileStateResult<T>>(
+	fn clients_op<
+		T,
+		F: FnOnce(MutexGuard<HashMap<ThreadId, ClientState>>) -> FileStateResult<T>,
+	>(
 		&self,
 		f: F,
 	) -> FileStateResult<T> {
@@ -133,9 +145,13 @@ impl FileState {
 	}
 
 	// Get a vector of clients using the current file
-	pub fn get_clients(&self, path: &Option<PathBuf>) -> FileStateResult<Vec<ThreadId>> {
+	pub fn for_each_client<F: FnMut((&ThreadId, &ClientState))>(
+		&self,
+		path: &Option<PathBuf>,
+		f: F,
+	) -> FileStateResult<()> {
 		let path = path.as_ref().ok_or("File not open".to_string())?;
-		self.filestate_op(&path, |f| f.get_clients())
+		self.filestate_op(&path, |fs| fs.for_each_client(f))
 	}
 
 	// Check whether there are no clients using the current file
