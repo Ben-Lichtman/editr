@@ -20,6 +20,18 @@ pub enum DeleteResult {
 }
 
 #[derive(Serialize, Deserialize)]
+pub struct RenameReqData {
+	from: String,
+	to: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum RenameResult {
+	Ok,
+	Err(String),
+}
+
+#[derive(Serialize, Deserialize)]
 pub enum OpenResult {
 	Ok(PathBuf),
 	Err(String),
@@ -99,6 +111,8 @@ pub enum Message {
 	CreateResp(CreateResult),
 	DeleteReq(String),
 	DeleteResp(DeleteResult),
+	RenameReq(RenameReqData),
+	RenameResp(RenameResult),
 	OpenReq(String),
 	OpenResp(OpenResult),
 	WriteReq(WriteReqData),
@@ -140,6 +154,10 @@ impl Message {
 			Message::DeleteReq(inner) => match thread_local.file_delete(&inner) {
 				Ok(_) => (Message::DeleteResp(DeleteResult::Ok), false),
 				Err(e) => (Message::DeleteResp(DeleteResult::Err(e.to_string())), false),
+			},
+			Message::RenameReq(inner) => match thread_local.file_rename(&inner.from, &inner.to) {
+				Ok(_) => (Message::RenameResp(RenameResult::Ok), false),
+				Err(e) => (Message::RenameResp(RenameResult::Err(e.to_string())), false),
 			},
 			Message::OpenReq(inner) => match thread_local.file_open(&inner) {
 				Ok(p) => (Message::OpenResp(OpenResult::Ok(p)), false),

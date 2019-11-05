@@ -54,6 +54,18 @@ impl LocalState {
 		}
 	}
 
+	// Renames the file at 'from' into 'to'
+	pub fn file_rename(&self, from: &str, to: &str) -> EditrResult<()> {
+		let from = Path::new(from).canonicalize()?;
+		match self.contains_file(&from)? {
+			false => {
+				fs::rename(from, to)?;
+				Ok(())
+			}
+			true => Err("File is busy".into()),
+		}
+	}
+
 	// Returns a list of filenames in canonical_home as Strings.
 	pub fn files_list(&self) -> EditrResult<Vec<String>> {
 		let mut list = Vec::new();
