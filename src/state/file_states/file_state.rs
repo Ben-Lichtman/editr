@@ -4,6 +4,7 @@ use std::ops::Deref;
 use std::sync::{Mutex, MutexGuard};
 use std::thread::ThreadId;
 
+use crate::error::EditrResult;
 use crate::rope::Rope;
 
 pub(super) struct FileState {
@@ -25,29 +26,29 @@ impl FileState {
 	}
 
 	// Inserts a new client by their ThreadId
-	pub fn add_client(&self, id: &ThreadId) -> Result<(), Box<dyn Error>> {
+	pub fn add_client(&self, id: ThreadId) -> EditrResult<()> {
 		self.clients_op(|mut clients| Ok(clients.insert(id.clone())))?;
 		Ok(())
 	}
 
 	// Removes a client by their ThreadId
-	pub fn remove_client(&self, id: &ThreadId) -> Result<(), Box<dyn Error>> {
-		self.clients_op(|mut clients| Ok(clients.remove(id)))?;
+	pub fn remove_client(&self, id: ThreadId) -> EditrResult<()> {
+		self.clients_op(|mut clients| Ok(clients.remove(&id)))?;
 		Ok(())
 	}
 
 	// Returns true if self doesn't have any clients
-	pub fn no_clients(&self) -> Result<bool, Box<dyn Error>> {
+	pub fn no_clients(&self) -> EditrResult<bool> {
 		Ok(self.clients_op(|clients| Ok(clients.is_empty()))?)
 	}
 
 	// Calls a closure f on each client
-	pub fn for_each_client<F: Fn(&ThreadId) -> Result<(), Box<dyn Error>>>(
+	pub fn for_each_client<F: Fn(ThreadId) -> EditrResult<()>>(
 		&self,
 		f: F,
 	) -> Result<(), Box<dyn Error>> {
 		self.clients_op(|clients| {
-			for c in clients.iter() {
+			for &c in clients.iter() {
 				f(c)?;
 			}
 			Ok(())
@@ -55,7 +56,7 @@ impl FileState {
 	}
 
 	// Locks clients and applies op
-	fn clients_op<T, F: FnOnce(MutexGuard<HashSet<ThreadId>>) -> Result<T, Box<dyn Error>>>(
+	fn clients_op<T, F: FnOnce(MutexGuard<HashSet<ThreadId>>) -> EditrResult<T>>(
 		&self,
 		op: F,
 	) -> Result<T, Box<dyn Error>> {
