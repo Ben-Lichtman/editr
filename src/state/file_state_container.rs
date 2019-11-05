@@ -36,8 +36,9 @@ impl FileStateContainer {
 				Some(file) => file.add_client(id)?,
 				// Read into container if not present
 				None => {
-					let rope = read_to_rope(&path)?;
-					container.insert(path.clone(), FileState::new(rope));
+					let file = FileState::new(read_to_rope(&path)?);
+					file.add_client(id)?;
+					container.insert(path.clone(), file);
 				}
 			}
 			Ok(())
