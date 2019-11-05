@@ -71,8 +71,8 @@ impl FileStates {
 		self.file_op(path, |file| file.insert_at(offset, data))
 	}
 
-	// Deletes from the file at path, starting from offset
-	pub fn delete(&self, path: &PathBuf, offset: usize, len: usize) -> EditrResult<()> {
+	// Removes from the file at path, starting from offset
+	pub fn remove(&self, path: &PathBuf, offset: usize, len: usize) -> EditrResult<()> {
 		self.file_op(path, |file| file.remove_range(offset, offset + len))
 	}
 

@@ -98,9 +98,9 @@ impl LocalState {
 		Ok(())
 	}
 
-	// Deletes from the file, starting from offset
-	pub fn file_delete(&self, offset: usize, len: usize) -> EditrResult<()> {
-		self.files.delete(self.get_opened()?, offset, len)?;
+	// Removes data from the file, starting from offset
+	pub fn file_remove(&self, offset: usize, len: usize) -> EditrResult<()> {
+		self.files.remove(self.get_opened()?, offset, len)?;
 		// Sync neighbours with deletion
 		self.broadcast_neighbours(Message::make_del_broadcast(offset, len))?;
 		Ok(())
