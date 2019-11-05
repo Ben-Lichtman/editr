@@ -38,6 +38,12 @@ pub enum OpenResult {
 }
 
 #[derive(Serialize, Deserialize)]
+pub enum CloseResult {
+	Ok,
+	Err(String),
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct WriteReqData {
 	offset: usize,
 	data: Vec<u8>,
@@ -115,6 +121,8 @@ pub enum Message {
 	RenameResp(RenameResult),
 	OpenReq(String),
 	OpenResp(OpenResult),
+	CloseReq,
+	CloseResp(CloseResult),
 	WriteReq(WriteReqData),
 	WriteResp(WriteResult),
 	UpdateMessage(UpdateData),
@@ -162,6 +170,10 @@ impl Message {
 			Message::OpenReq(inner) => match thread_local.file_open(&inner) {
 				Ok(p) => (Message::OpenResp(OpenResult::Ok(p)), false),
 				Err(e) => (Message::OpenResp(OpenResult::Err(e.to_string())), false),
+			},
+			Message::CloseReq => match thread_local.file_close() {
+				Ok(_) => (Message::CloseResp(CloseResult::Ok), false),
+				Err(e) => (Message::CloseResp(CloseResult::Err(e.to_string())), false),
 			},
 			Message::WriteReq(inner) => match thread_local.file_write(inner.offset, &inner.data) {
 				Ok(_) => (Message::WriteResp(WriteResult::Ok), false),
