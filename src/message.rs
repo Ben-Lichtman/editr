@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use serde_json;
 
-use crate::state::thread_state::ThreadState;
+use crate::state::*;
 
 #[derive(Serialize, Deserialize)]
 pub enum CreateResult {
@@ -114,7 +114,7 @@ impl Message {
 		Message::UpdateMessage(UpdateData::Remove(UpdateRemove { offset, len }))
 	}
 
-	pub fn process(self, thread_local: &mut ThreadState) -> (Message, bool) {
+	pub fn process(self, thread_local: &mut LocalState) -> (Message, bool) {
 		match self {
 			Message::Echo(inner) => (Message::Echo(inner), false),
 			Message::CreateReq(inner) => match thread_local.file_create(&inner) {
