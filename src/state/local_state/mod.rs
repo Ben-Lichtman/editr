@@ -45,24 +45,33 @@ impl LocalState {
 	// Deletes the file at path
 	pub fn file_delete(&self, path: &str) -> EditrResult<()> {
 		let path = Path::new(path).canonicalize()?;
-		match self.contains_file(&path)? {
-			false => {
-				fs::remove_file(path)?;
-				Ok(())
-			}
-			true => Err("File is busy".into()),
+		// File must not be open by anyone
+		if self.contains_file(&path)? {
+			Err("File is busy".into())
+		}
+		else {
+			fs::remove_file(path)?;
+			Ok(())
 		}
 	}
 
 	// Renames the file at 'from' into 'to'
 	pub fn file_rename(&self, from: &str, to: &str) -> EditrResult<()> {
 		let from = Path::new(from).canonicalize()?;
-		match self.contains_file(&from)? {
-			false => {
+		let to = Path::new(to);
+
+		if to.exists() {
+			Err("File already exists".into())
+		}
+		else {
+			// File must not be open by anyone
+			if self.contains_file(&from)? {
+				Err("File is busy".into())
+			}
+			else {
 				fs::rename(from, to)?;
 				Ok(())
 			}
-			true => Err("File is busy".into()),
 		}
 	}
 
