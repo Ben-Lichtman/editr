@@ -10,7 +10,7 @@ use crate::state::*;
 const MAX_MESSAGE: usize = 1024;
 
 // The main function run by the client thread
-fn client_thread(thread_local: &mut ThreadState) -> Result<(), Box<dyn Error>> {
+fn client_thread(thread_local: &mut LocalState) -> Result<(), Box<dyn Error>> {
 	let mut buffer = [0u8; MAX_MESSAGE];
 	loop {
 		let num_read = thread_local.socket_read(&mut buffer)?;

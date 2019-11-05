@@ -39,21 +39,13 @@ impl SharedIO {
 
 	// Given a valid thread_id, reads from its stream and
 	// places read data into buffer
-	pub fn socket_read(
-		&self,
-		thread_id: ThreadId,
-		buffer: &mut [u8],
-	) -> Result<usize, Box<dyn Error>> {
+	pub fn read(&self, thread_id: ThreadId, buffer: &mut [u8]) -> Result<usize, Box<dyn Error>> {
 		self.thread_io_op(thread_id, |io| io.read(buffer))
 	}
 
 	// Given a valid thread_id, reads from its stream and
 	// places read data into buffer
-	pub fn socket_write(
-		&self,
-		thread_id: ThreadId,
-		buffer: &[u8],
-	) -> Result<usize, Box<dyn Error>> {
+	pub fn write(&self, thread_id: ThreadId, buffer: &[u8]) -> Result<usize, Box<dyn Error>> {
 		self.thread_io_op(thread_id, |io| io.write(buffer))
 	}
 
