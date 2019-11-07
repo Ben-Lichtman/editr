@@ -1,6 +1,6 @@
 use std::fs::{self, OpenOptions};
 use std::net::TcpStream;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::thread::{current, ThreadId};
 
 use crate::error::EditrResult;
@@ -38,13 +38,13 @@ impl LocalState {
 
 	// Creates a new file at path
 	pub fn file_create(&self, path: &str) -> EditrResult<()> {
-		OpenOptions::new().write(true).create_new(true).open(path)?;
+		OpenOptions::new().write(true).create_new(true).open(self.prepend_home(path))?;
 		Ok(())
 	}
 
 	// Deletes the file at path
 	pub fn file_delete(&self, path: &str) -> EditrResult<()> {
-		let path = Path::new(path).canonicalize()?;
+		let path = self.prepend_home(path).canonicalize()?;
 		// File must not be open by anyone
 		if self.contains_file(&path)? {
 			Err("File is busy".into())
@@ -57,8 +57,8 @@ impl LocalState {
 
 	// Renames the file at 'from' into 'to'
 	pub fn file_rename(&self, from: &str, to: &str) -> EditrResult<()> {
-		let from = Path::new(from).canonicalize()?;
-		let to = Path::new(to);
+		let from = self.prepend_home(from).canonicalize()?;
+		let to = self.prepend_home(to);
 
 		if to.exists() {
 			Err("File already exists".into())
@@ -90,7 +90,7 @@ impl LocalState {
 		// (currently) clients can only have one file open
 		self.file_close()?;
 
-		let canonical_path = Path::new(path).canonicalize()?;
+		let canonical_path = self.prepend_home(path).canonicalize()?;
 
 		// Check that path is valid given client home
 		if !canonical_path.starts_with(self.canonical_home()) {
@@ -157,5 +157,11 @@ impl LocalState {
 			Ok(())
 		})?;
 		Ok(())
+	}
+
+	fn prepend_home(&self, path: &str) -> PathBuf {
+		let mut new_path = self.canonical_home().clone();
+		new_path.push(path);
+		new_path
 	}
 }
