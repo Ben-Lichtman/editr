@@ -25,6 +25,8 @@ fn client_thread(thread_local: &mut LocalState) -> Result<(), Box<dyn Error>> {
 
 		let response_raw = response.to_vec()?;
 
+		println!("Sent: {}", std::str::from_utf8(&response_raw)?);
+
 		let num_written = thread_local.socket_write(&response_raw)?;
 
 		// Check for a EOF
