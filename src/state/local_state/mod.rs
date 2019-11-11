@@ -1,5 +1,6 @@
 use std::fs::{self, OpenOptions};
 use std::net::TcpStream;
+
 use std::path::PathBuf;
 use std::thread::{current, ThreadId};
 
@@ -9,36 +10,40 @@ use crate::state::*;
 
 pub struct LocalState {
 	thread_id: ThreadId,
-	threads_io: SharedIO,
+	socket: Socket,
 	files: FileStates,
 	canonical_home: PathBuf,
 	opened_file: Option<PathBuf>,
 }
 
 impl LocalState {
-	pub fn new(threads_io: SharedIO, files: FileStates, canonical_home: PathBuf) -> LocalState {
-		LocalState {
+	pub fn new(
+		threads_out: shared_out::SharedOut,
+		files: FileStates,
+		canonical_home: PathBuf,
+		stream: TcpStream,
+	) -> EditrResult<LocalState> {
+		Ok(LocalState {
 			thread_id: current().id(),
-			threads_io,
+			socket: Socket::new(current().id(), stream, threads_out)?,
 			files,
 			canonical_home,
 			opened_file: None,
-		}
+		})
 	}
 
 	pub fn canonical_home(&self) -> &PathBuf { &self.canonical_home }
 
 	pub fn contains_file(&self, path: &PathBuf) -> EditrResult<bool> { self.files.contains(path) }
 
-	pub fn insert_thread_io(&mut self, stream: TcpStream) -> EditrResult<()> {
-		self.threads_io.insert(self.thread_id, stream)
-	}
-
-	pub fn remove_thread_io(&mut self) -> EditrResult<()> { self.threads_io.remove(self.thread_id) }
+	pub fn remove_thread_io(&mut self) -> EditrResult<()> { self.socket.close() }
 
 	// Creates a new file at path
 	pub fn file_create(&self, path: &str) -> EditrResult<()> {
-		OpenOptions::new().write(true).create_new(true).open(self.prepend_home(path))?;
+		OpenOptions::new()
+			.write(true)
+			.create_new(true)
+			.open(self.prepend_home(path))?;
 		Ok(())
 	}
 
@@ -113,12 +118,12 @@ impl LocalState {
 		Ok(())
 	}
 
-	pub fn socket_read(&self, buffer: &mut [u8]) -> EditrResult<usize> {
-		self.threads_io.read(self.thread_id, buffer)
+	pub fn socket_read(&mut self, buffer: &mut [u8]) -> EditrResult<usize> {
+		self.socket.read(buffer)
 	}
 
 	pub fn socket_write(&self, buffer: &[u8]) -> EditrResult<usize> {
-		self.threads_io.write(self.thread_id, buffer)
+		self.socket.write(self.thread_id, buffer)
 	}
 
 	pub fn file_read(&self, from: usize, to: usize) -> EditrResult<Vec<u8>> {
@@ -152,13 +157,14 @@ impl LocalState {
 		let data = msg.to_vec()?;
 		self.files.for_each_client(self.get_opened()?, |client| {
 			if client != self.thread_id {
-				self.threads_io.write(client, &data)?;
+				self.socket.write(client, &data)?;
 			}
 			Ok(())
 		})?;
 		Ok(())
 	}
 
+	// Prepends user input paths with canonical home
 	fn prepend_home(&self, path: &str) -> PathBuf {
 		let mut new_path = self.canonical_home().clone();
 		new_path.push(path);

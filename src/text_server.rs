@@ -58,18 +58,18 @@ pub fn start<A: ToSocketAddrs>(path: &Path, address: A) -> Result<(), Box<dyn Er
 
 	let files: FileStates = FileStates::new();
 
-	let threads_io: SharedIO = SharedIO::new();
+	let shared_out: shared_out::SharedOut = shared_out::SharedOut::new();
 
 	for stream_result in listener.incoming() {
 		let canonical_home = canonical_home.clone();
 		let files = files.clone();
-		let threads_io = threads_io.clone();
+		let shared_out = shared_out.clone();
 
 		spawn(move || {
 			let stream = stream_result.unwrap();
 
-			let mut thread_local = LocalState::new(threads_io, files, canonical_home);
-			thread_local.insert_thread_io(stream).unwrap();
+			let mut thread_local =
+				LocalState::new(shared_out, files, canonical_home, stream).unwrap();
 
 			client_thread(&mut thread_local).unwrap();
 
