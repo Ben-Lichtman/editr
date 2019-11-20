@@ -1,12 +1,13 @@
 mod file_state;
 
 use std::collections::HashMap;
-use std::error::Error;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::PathBuf;
-use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use std::sync::Arc;
 use std::thread::ThreadId;
+
+use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use self::file_state::FileState;
 use crate::error::EditrResult;
@@ -91,7 +92,7 @@ impl FileStates {
 		&self,
 		path: &PathBuf,
 		f: F,
-	) -> Result<(), Box<dyn Error>> {
+	) -> EditrResult<()> {
 		self.file_op(path, |file| file.for_each_client(|id| f(id)))
 	}
 
@@ -99,16 +100,16 @@ impl FileStates {
 	fn op<T, F: FnOnce(RwLockReadGuard<HashMap<PathBuf, FileState>>) -> EditrResult<T>>(
 		&self,
 		op: F,
-	) -> Result<T, Box<dyn Error>> {
-		op(self.container.read().map_err(|e| e.to_string())?)
+	) -> EditrResult<T> {
+		op(self.container.read())
 	}
 
 	// Applies an op that requires a write lock on the underlying container
 	fn mut_op<T, F: FnOnce(RwLockWriteGuard<HashMap<PathBuf, FileState>>) -> EditrResult<T>>(
 		&self,
 		op: F,
-	) -> Result<T, Box<dyn Error>> {
-		op(self.container.write().map_err(|e| e.to_string())?)
+	) -> EditrResult<T> {
+		op(self.container.write())
 	}
 
 	// Applies an op on path's FileState
@@ -116,7 +117,7 @@ impl FileStates {
 		&self,
 		path: &PathBuf,
 		op: F,
-	) -> Result<T, Box<dyn Error>> {
+	) -> EditrResult<T> {
 		self.op(|container| {
 			op(container
 				.get(path)
