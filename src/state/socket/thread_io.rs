@@ -27,7 +27,6 @@ pub(super) struct ThreadOut {
 impl ThreadOut {
 	pub fn new(stream: TcpStream) -> EditrResult<ThreadOut> {
 		let writer_copy = stream.try_clone()?;
-
 		Ok(ThreadOut {
 			writer: Mutex::new(BufWriter::with_capacity(0, writer_copy)),
 		})

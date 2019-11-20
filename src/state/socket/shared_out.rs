@@ -1,8 +1,9 @@
 use std::collections::HashMap;
-use std::error::Error;
 use std::net::TcpStream;
-use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use std::sync::Arc;
 use std::thread::ThreadId;
+
+use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use super::thread_io::ThreadOut;
 use crate::error::EditrResult;
@@ -47,7 +48,7 @@ impl SharedOut {
 		&self,
 		id: ThreadId,
 		op: F,
-	) -> Result<T, Box<dyn Error>> {
+	) -> EditrResult<T> {
 		self.hashmap_op(|hashmap| {
 			op(hashmap
 				.get(&id)
@@ -60,8 +61,8 @@ impl SharedOut {
 	fn hashmap_op<T, F: FnOnce(RwLockReadGuard<HashMap<ThreadId, ThreadOut>>) -> EditrResult<T>>(
 		&self,
 		op: F,
-	) -> Result<T, Box<dyn Error>> {
-		op(self.shared_out.read().map_err(|e| e.to_string())?)
+	) -> EditrResult<T> {
+		op(self.shared_out.read())
 	}
 
 	// Performs an operation that requires write access to the
@@ -72,7 +73,7 @@ impl SharedOut {
 	>(
 		&self,
 		op: F,
-	) -> Result<T, Box<dyn Error>> {
-		op(self.shared_out.write().map_err(|e| e.to_string())?)
+	) -> EditrResult<T> {
+		op(self.shared_out.write())
 	}
 }
