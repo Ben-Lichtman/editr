@@ -72,6 +72,14 @@ impl Node {
 				// Move Vec out of the node
 				let mut left_node_data = replace(&mut inner.data, Vec::new());
 
+				// Add bounds checking to avoid panicking
+				let index = if index > left_node_data.len() {
+					left_node_data.len()
+				}
+				else {
+					index
+				};
+
 				// Split into 2 - clone is performed here
 				let right_node_data = left_node_data.split_off(index);
 
