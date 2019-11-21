@@ -36,7 +36,7 @@ impl LocalState {
 
 	pub fn contains_file(&self, path: &PathBuf) -> EditrResult<bool> { self.files.contains(path) }
 
-	pub fn remove_thread_io(&mut self) -> EditrResult<()> { self.socket.close() }
+	pub fn remove_thread_io(&mut self) -> EditrResult<()> { self.socket.close(self.thread_id) }
 
 	// Creates a new file at path
 	pub fn file_create(&self, path: &str) -> EditrResult<()> {

@@ -11,7 +11,6 @@ use thread_io::ThreadIn;
 pub struct Socket {
 	local_in: ThreadIn,
 	shared_out: SharedOut,
-	thread_id: ThreadId,
 }
 
 impl Socket {
@@ -20,7 +19,6 @@ impl Socket {
 		Ok(Socket {
 			local_in: ThreadIn::new(stream)?,
 			shared_out: out,
-			thread_id,
 		})
 	}
 
@@ -33,5 +31,7 @@ impl Socket {
 	}
 
 	// Closes the socket
-	pub fn close(&self) -> EditrResult<()> { self.shared_out.remove(self.thread_id) }
+	pub fn close(&self, thread_id: ThreadId) -> EditrResult<()> {
+		self.shared_out.remove(thread_id)
+	}
 }
