@@ -28,12 +28,20 @@ impl FileState {
 	// Inserts a new client by their ThreadId
 	pub fn add_client(&self, id: ThreadId) -> EditrResult<()> {
 		self.clients_op(|mut clients| Ok(clients.insert(id.clone())))?;
+		self.clients_op(|clients| {
+			println!("== Adding client to file: ({})", clients.len());
+			Ok(())
+		})?;
 		Ok(())
 	}
 
 	// Removes a client by their ThreadId
 	pub fn remove_client(&self, id: ThreadId) -> EditrResult<()> {
 		self.clients_op(|mut clients| Ok(clients.remove(&id)))?;
+		self.clients_op(|clients| {
+			println!("== Removing client to file: ({})", clients.len());
+			Ok(())
+		})?;
 		Ok(())
 	}
 

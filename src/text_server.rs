@@ -6,7 +6,7 @@ use std::thread::spawn;
 use crate::message::Message;
 use crate::state::*;
 
-const MAX_MESSAGE: usize = 1024;
+const MAX_MESSAGE: usize = 4096 * 10;
 
 // The main function run by the client thread
 fn client_thread(thread_local: &mut LocalState) -> Result<(), Box<dyn Error>> {
