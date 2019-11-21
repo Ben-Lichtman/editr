@@ -71,7 +71,12 @@ pub fn start<A: ToSocketAddrs>(path: &Path, address: A) -> Result<(), Box<dyn Er
 			let mut thread_local =
 				LocalState::new(shared_out, files, canonical_home, stream).unwrap();
 
-			client_thread(&mut thread_local).unwrap();
+			// Handle errors safely without breaking the server state
+			client_thread(&mut thread_local)
+				.map_err(|e| {
+					println!("Thread exited with error: {}", e);
+				})
+				.ok();
 
 			// Close file
 			thread_local.file_close().unwrap();
