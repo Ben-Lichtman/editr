@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-use serde_json;
+use serde_cbor;
 
 use crate::state::*;
 
@@ -185,7 +185,7 @@ pub enum Message {
 
 impl Message {
 	pub fn from_slice(slice: &[u8]) -> Result<Message, Box<dyn Error>> {
-		Ok(serde_json::from_slice(slice).map_err(|e| e.to_string())?)
+		Ok(serde_cbor::from_slice(slice).map_err(|e| e.to_string())?)
 	}
 
 	pub fn make_add_broadcast(offset: usize, data: &[u8]) -> Message {
@@ -285,6 +285,6 @@ impl Message {
 	}
 
 	pub fn to_vec(&self) -> Result<Vec<u8>, Box<dyn Error>> {
-		Ok(serde_json::to_vec(self).map_err(|e| e.to_string())?)
+		Ok(serde_cbor::to_vec(self).map_err(|e| e.to_string())?)
 	}
 }
