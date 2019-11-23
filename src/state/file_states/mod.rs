@@ -13,7 +13,7 @@ use self::file_state::FileState;
 use crate::error::EditrResult;
 use crate::rope::Rope;
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct FileStates {
 	container: Arc<RwLock<HashMap<PathBuf, FileState>>>,
 }
@@ -94,6 +94,18 @@ impl FileStates {
 		f: F,
 	) -> EditrResult<()> {
 		self.file_op(path, |file| file.for_each_client(|id| f(id)))
+	}
+
+	pub fn move_cursor(&self, path: &PathBuf, id: ThreadId, offset: isize) -> EditrResult<()> {
+		self.file_op(path, |file| file.move_cursor(id, offset))
+	}
+
+	pub fn file_write_cursor(&self, path: &PathBuf, id: ThreadId, data: &[u8]) -> EditrResult<()> {
+		self.file_op(path, |file| file.write_at_cursor(id, data))
+	}
+
+	pub fn file_remove_cursor(&self, path: &PathBuf, id: ThreadId, len: usize) -> EditrResult<()> {
+		self.file_op(path, |file| file.remove_at_cursor(id, len))
 	}
 
 	// Applies an op that requires a read lock on the underlying container

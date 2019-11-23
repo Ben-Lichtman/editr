@@ -14,8 +14,6 @@ fn client_thread(thread_local: &mut LocalState) -> Result<(), Box<dyn Error>> {
 	loop {
 		let num_read = thread_local.socket_read(&mut buffer)?;
 
-		println!("<=: {}", std::str::from_utf8(&buffer[..num_read])?);
-
 		// Check for a EOF
 		if num_read == 0 {
 			break;
@@ -23,11 +21,13 @@ fn client_thread(thread_local: &mut LocalState) -> Result<(), Box<dyn Error>> {
 
 		let msg = Message::from_slice(&buffer[..num_read])?;
 
+		println!("<=: {:?}", msg);
+
 		let (response, exit) = msg.process(thread_local);
 
-		let response_raw = response.to_vec()?;
+		println!("=>: {:?}", response);
 
-		println!("=>: {}", std::str::from_utf8(&response_raw)?);
+		let response_raw = response.to_vec()?;
 
 		let num_written = thread_local.socket_write(&response_raw)?;
 

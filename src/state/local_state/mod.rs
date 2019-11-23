@@ -84,8 +84,8 @@ impl LocalState {
 	pub fn files_list(&self) -> EditrResult<Vec<String>> {
 		let mut list = Vec::new();
 		for f in self.canonical_home.read_dir()? {
-			if let Some(name) = f?.file_name().into_string().ok() {
-				list.push(name);
+			if let Ok(name) = f?.file_name().into_string() {
+				list.push(name)
 			}
 		}
 		Ok(list)
@@ -148,8 +148,25 @@ impl LocalState {
 	// Saves file to disk
 	pub fn file_save(&self) -> EditrResult<()> { self.files.flush(self.get_opened()?) }
 
+	pub fn move_cursor(&self, offset: isize) -> EditrResult<()> {
+		self.files
+			.move_cursor(self.get_opened()?, self.thread_id, offset)
+	}
+
+	pub fn file_write_cursor(&self, data: Vec<u8>) -> EditrResult<()> {
+		self.files
+			.file_write_cursor(self.get_opened()?, self.thread_id, &data)
+	}
+
+	pub fn file_remove_cursor(&self, len: usize) -> EditrResult<()> {
+		self.files
+			.file_remove_cursor(self.get_opened()?, self.thread_id, len)
+	}
+
 	fn get_opened(&self) -> EditrResult<&PathBuf> {
-		self.opened_file.as_ref().ok_or("File not open".into())
+		self.opened_file
+			.as_ref()
+			.ok_or_else(|| "File not open".into())
 	}
 
 	// Broadcasts a message to other clients in the same file as self

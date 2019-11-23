@@ -4,9 +4,10 @@ mod thread_io;
 use std::net::TcpStream;
 use std::thread::ThreadId;
 
-use crate::error::EditrResult;
 use shared_out::SharedOut;
 use thread_io::ThreadIn;
+
+use crate::error::EditrResult;
 
 pub struct Socket {
 	local_in: ThreadIn,
