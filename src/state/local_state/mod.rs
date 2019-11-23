@@ -91,7 +91,7 @@ impl LocalState {
 		Ok(list)
 	}
 
-	pub fn file_open(&mut self, path: &str) -> EditrResult<PathBuf> {
+	pub fn file_open(&mut self, path: &str, name: Option<String>) -> EditrResult<PathBuf> {
 		// (currently) clients can only have one file open
 		self.file_close()?;
 
@@ -102,7 +102,8 @@ impl LocalState {
 			return Err("Invalid file path".into());
 		}
 
-		self.files.open(canonical_path.clone(), self.thread_id)?;
+		self.files
+			.open(canonical_path.clone(), self.thread_id, name.clone())?;
 
 		self.opened_file = Some(canonical_path.clone());
 
@@ -163,7 +164,7 @@ impl LocalState {
 			.file_remove_cursor(self.get_opened()?, self.thread_id, len)
 	}
 
-	pub fn get_cursors(&self) -> EditrResult<(usize, Vec<usize>)> {
+	pub fn get_cursors(&self) -> EditrResult<(usize, Vec<(usize, Option<String>)>)> {
 		self.files.get_cursors(self.get_opened()?, self.thread_id)
 	}
 

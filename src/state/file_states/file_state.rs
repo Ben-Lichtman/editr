@@ -9,7 +9,7 @@ use crate::rope::Rope;
 
 pub(super) struct FileState {
 	rope: Rope,
-	clients: Mutex<HashMap<ThreadId, usize>>,
+	clients: Mutex<HashMap<ThreadId, (usize, Option<String>)>>,
 }
 
 impl Deref for FileState {
@@ -26,8 +26,8 @@ impl FileState {
 	}
 
 	// Inserts a new client by their ThreadId
-	pub fn add_client(&self, id: ThreadId) -> EditrResult<()> {
-		self.clients_op(|mut clients| Ok(clients.insert(id.clone(), 0)))?;
+	pub fn add_client(&self, id: ThreadId, name: Option<String>) -> EditrResult<()> {
+		self.clients_op(|mut clients| Ok(clients.insert(id, (0, name))))?;
 		Ok(())
 	}
 
@@ -48,7 +48,7 @@ impl FileState {
 		f: F,
 	) -> Result<(), Box<dyn Error>> {
 		self.clients_op(|clients| {
-			for (key, _val) in clients.iter() {
+			for (key, _) in clients.iter() {
 				f(*key)?;
 			}
 			Ok(())
@@ -57,10 +57,11 @@ impl FileState {
 
 	pub fn move_cursor(&self, id: ThreadId, offset: isize) -> EditrResult<()> {
 		Ok(self.clients_op(|mut clients| {
-			if let Some(value) = clients.get(&id) {
-				let new_offset_signed = *value as isize + offset;
+			if let Some((found_offset, name)) = clients.get(&id) {
+				let name_clone = name.clone();
+				let new_offset_signed = *found_offset as isize + offset;
 				let new_offset_unsigned = new_offset_signed as usize;
-				clients.insert(id, new_offset_unsigned);
+				clients.insert(id, (new_offset_unsigned, name_clone));
 			}
 			Ok(())
 		})?)
@@ -69,16 +70,16 @@ impl FileState {
 	pub fn write_at_cursor(&self, id: ThreadId, data: &[u8]) -> EditrResult<()> {
 		self.clients_op(|mut clients| {
 			let found_value = match clients.get(&id) {
-				Some(value) => *value,
+				Some((found_offset, _)) => *found_offset,
 				None => return Err("ID not found in clients".into()),
 			};
 
 			self.insert_at(found_value, data)?;
 
-			for (_, value) in clients.iter_mut() {
-				if *value >= found_value {
-					let new_offset_signed = *value as isize + data.len() as isize;
-					*value = new_offset_signed as usize;
+			for (_, (found_offset, _)) in clients.iter_mut() {
+				if *found_offset >= found_value {
+					let new_offset_signed = *found_offset as isize + data.len() as isize;
+					*found_offset = new_offset_signed as usize;
 				}
 			}
 			Ok(())
@@ -89,37 +90,43 @@ impl FileState {
 	pub fn remove_at_cursor(&self, id: ThreadId, len: usize) -> EditrResult<()> {
 		Ok(self.clients_op(|mut clients| {
 			let found_value = match clients.get(&id) {
-				Some(value) => *value,
+				Some((found_offset, _)) => *found_offset,
 				None => return Err("ID not found in clients".into()),
 			};
 
 			self.remove_range(found_value, found_value + len)?;
 
-			for (_, value) in clients.iter_mut() {
-				if *value >= found_value {
-					let new_offset_signed = *value as isize - len as isize;
-					*value = new_offset_signed as usize;
+			for (_, (found_offset, _)) in clients.iter_mut() {
+				if *found_offset >= found_value {
+					let new_offset_signed = *found_offset as isize - len as isize;
+					*found_offset = new_offset_signed as usize;
 				}
 			}
 			Ok(())
 		})?)
 	}
 
-	pub fn get_cursors(&self, id: ThreadId) -> EditrResult<(usize, Vec<usize>)> {
+	pub fn get_cursors(&self, id: ThreadId) -> EditrResult<(usize, Vec<(usize, Option<String>)>)> {
 		Ok(self.clients_op(|clients| {
 			let found_value = match clients.get(&id) {
-				Some(value) => *value,
+				Some((found_offset, _)) => *found_offset,
 				None => return Err("ID not found in clients".into()),
 			};
 
-			let others = clients.iter().map(|(_, value)| *value).collect();
+			let others = clients
+				.iter()
+				.map(|(_, (found_offset, name))| (*found_offset, name.clone()))
+				.collect();
 
 			Ok((found_value, others))
 		})?)
 	}
 
 	// Locks clients and applies op
-	fn clients_op<T, F: FnOnce(MutexGuard<HashMap<ThreadId, usize>>) -> EditrResult<T>>(
+	fn clients_op<
+		T,
+		F: FnOnce(MutexGuard<HashMap<ThreadId, (usize, Option<String>)>>) -> EditrResult<T>,
+	>(
 		&self,
 		op: F,
 	) -> Result<T, Box<dyn Error>> {

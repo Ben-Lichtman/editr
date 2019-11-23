@@ -32,6 +32,12 @@ pub enum RenameResult {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct OpenReqData {
+	file: String,
+	name: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub enum OpenResult {
 	Ok(PathBuf),
 	Err(String),
@@ -139,7 +145,7 @@ pub enum RemoveAtCursorResult {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum GetCursorsResult {
-	Ok((usize, Vec<usize>)),
+	Ok((usize, Vec<(usize, Option<String>)>)),
 	Err(String),
 }
 #[derive(Serialize, Deserialize, Debug)]
@@ -152,7 +158,7 @@ pub enum Message {
 	DeleteResp(DeleteResult),
 	RenameReq(RenameReqData),
 	RenameResp(RenameResult),
-	OpenReq(String),
+	OpenReq(OpenReqData),
 	OpenResp(OpenResult),
 	CloseReq,
 	CloseResp(CloseResult),
@@ -208,7 +214,7 @@ impl Message {
 				Ok(_) => (Message::RenameResp(RenameResult::Ok), false),
 				Err(e) => (Message::RenameResp(RenameResult::Err(e.to_string())), false),
 			},
-			Message::OpenReq(inner) => match thread_local.file_open(&inner) {
+			Message::OpenReq(inner) => match thread_local.file_open(&inner.file, inner.name) {
 				Ok(p) => (Message::OpenResp(OpenResult::Ok(p)), false),
 				Err(e) => (Message::OpenResp(OpenResult::Err(e.to_string())), false),
 			},

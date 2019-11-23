@@ -33,14 +33,14 @@ impl FileStates {
 	// Opens the file at path for the client.
 	// If the file isn't in container, it will be read in.
 	// TODO: Minimise write lock while avoiding race on insertion
-	pub fn open(&self, path: PathBuf, id: ThreadId) -> EditrResult<()> {
+	pub fn open(&self, path: PathBuf, id: ThreadId, name: Option<String>) -> EditrResult<()> {
 		self.mut_op(|mut container| {
 			match container.get(&path) {
-				Some(file) => file.add_client(id)?,
+				Some(file) => file.add_client(id, name)?,
 				// Read into container if not present
 				None => {
 					let file = FileState::new(read_to_rope(&path)?);
-					file.add_client(id)?;
+					file.add_client(id, name)?;
 					container.insert(path.clone(), file);
 				}
 			}
@@ -108,7 +108,11 @@ impl FileStates {
 		self.file_op(path, |file| file.remove_at_cursor(id, len))
 	}
 
-	pub fn get_cursors(&self, path: &PathBuf, id: ThreadId) -> EditrResult<(usize, Vec<usize>)> {
+	pub fn get_cursors(
+		&self,
+		path: &PathBuf,
+		id: ThreadId,
+	) -> EditrResult<(usize, Vec<(usize, Option<String>)>)> {
 		self.file_op(path, |file| file.get_cursors(id))
 	}
 
