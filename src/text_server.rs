@@ -6,20 +6,10 @@ use std::thread::spawn;
 use crate::message::Message;
 use crate::state::*;
 
-const MAX_MESSAGE: usize = 4096 * 10;
-
 // The main function run by the client thread
-fn client_thread(thread_local: &mut LocalState) -> Result<(), Box<dyn Error>> {
-	let mut buffer = [0u8; MAX_MESSAGE];
+fn client_thread(mut thread_local: &mut LocalState) -> Result<(), Box<dyn Error>> {
 	loop {
-		let num_read = thread_local.socket_read(&mut buffer)?;
-
-		// Check for a EOF
-		if num_read == 0 {
-			break;
-		}
-
-		let msg = Message::from_slice(&buffer[..num_read])?;
+		let msg = Message::from_reader(&mut thread_local)?;
 
 		println!("<=: {:?}", msg);
 

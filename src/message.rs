@@ -1,4 +1,5 @@
 use std::error::Error;
+use std::io::Read;
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
@@ -184,8 +185,8 @@ pub enum Message {
 }
 
 impl Message {
-	pub fn from_slice(slice: &[u8]) -> Result<Message, Box<dyn Error>> {
-		Ok(serde_json::from_slice(slice).map_err(|e| e.to_string())?)
+	pub fn from_reader<R: Read>(reader: R) -> Result<Message, Box<dyn Error>> {
+		Ok(serde_json::from_reader(reader).map_err(|e| e.to_string())?)
 	}
 
 	pub fn make_add_broadcast(offset: usize, data: &[u8]) -> Message {

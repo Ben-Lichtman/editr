@@ -1,4 +1,5 @@
 use std::fs::{self, OpenOptions};
+use std::io::Read;
 use std::net::TcpStream;
 
 use std::path::PathBuf;
@@ -14,6 +15,12 @@ pub struct LocalState {
 	files: FileStates,
 	canonical_home: PathBuf,
 	opened_file: Option<PathBuf>,
+}
+
+impl Read for LocalState {
+	fn read(&mut self, buffer: &mut [u8]) -> Result<usize, std::io::Error> {
+		self.socket.read(buffer)
+	}
 }
 
 impl LocalState {
@@ -117,10 +124,6 @@ impl LocalState {
 			self.opened_file = None;
 		}
 		Ok(())
-	}
-
-	pub fn socket_read(&mut self, buffer: &mut [u8]) -> EditrResult<usize> {
-		self.socket.read(buffer)
 	}
 
 	pub fn socket_write(&self, buffer: &[u8]) -> EditrResult<usize> {
