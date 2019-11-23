@@ -67,7 +67,7 @@ impl FileState {
 		})?)
 	}
 
-	pub fn write_at_cursor(&self, id: ThreadId, data: &[u8]) -> EditrResult<()> {
+	pub fn write_at_cursor(&self, id: ThreadId, data: &[u8]) -> EditrResult<usize> {
 		self.clients_op(|mut clients| {
 			let found_value = match clients.get(&id) {
 				Some((found_offset, _)) => *found_offset,
@@ -82,12 +82,11 @@ impl FileState {
 					*found_offset = new_offset_signed as usize;
 				}
 			}
-			Ok(())
-		})?;
-		Ok(())
+			Ok(found_value)
+		})
 	}
 
-	pub fn remove_at_cursor(&self, id: ThreadId, len: usize) -> EditrResult<()> {
+	pub fn remove_at_cursor(&self, id: ThreadId, len: usize) -> EditrResult<usize> {
 		Ok(self.clients_op(|mut clients| {
 			let found_value = match clients.get(&id) {
 				Some((found_offset, _)) => *found_offset,
@@ -102,7 +101,7 @@ impl FileState {
 					*found_offset = new_offset_signed as usize;
 				}
 			}
-			Ok(())
+			Ok(found_value)
 		})?)
 	}
 

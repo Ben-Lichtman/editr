@@ -266,7 +266,7 @@ impl Message {
 					false,
 				),
 			},
-			Message::WriteAtCursorReq(inner) => match thread_local.file_write_cursor(inner.data) {
+			Message::WriteAtCursorReq(inner) => match thread_local.file_write_cursor(&inner.data) {
 				Ok(_) => (Message::WriteAtCursorResp(WriteAtCursorResult::Ok), false),
 				Err(e) => (
 					Message::WriteAtCursorResp(WriteAtCursorResult::Err(e.to_string())),

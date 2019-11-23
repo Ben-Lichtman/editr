@@ -152,14 +152,22 @@ impl LocalState {
 			.move_cursor(self.get_opened()?, self.thread_id, offset)
 	}
 
-	pub fn file_write_cursor(&self, data: Vec<u8>) -> EditrResult<()> {
-		self.files
-			.file_write_cursor(self.get_opened()?, self.thread_id, &data)
+	pub fn file_write_cursor(&self, data: &[u8]) -> EditrResult<()> {
+		let op_offset = self
+			.files
+			.file_write_cursor(self.get_opened()?, self.thread_id, &data)?;
+		// Sync neigbours with the data just written
+		self.broadcast_neighbours(Message::make_add_broadcast(op_offset, data))?;
+		Ok(())
 	}
 
 	pub fn file_remove_cursor(&self, len: usize) -> EditrResult<()> {
-		self.files
-			.file_remove_cursor(self.get_opened()?, self.thread_id, len)
+		let op_offset = self
+			.files
+			.file_remove_cursor(self.get_opened()?, self.thread_id, len)?;
+		// Sync neighbours with deletion
+		self.broadcast_neighbours(Message::make_del_broadcast(op_offset, len))?;
+		Ok(())
 	}
 
 	pub fn get_cursors(&self) -> EditrResult<(usize, Vec<(usize, Option<String>)>)> {

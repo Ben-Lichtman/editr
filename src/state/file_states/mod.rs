@@ -100,11 +100,21 @@ impl FileStates {
 		self.file_op(path, |file| file.move_cursor(id, offset))
 	}
 
-	pub fn file_write_cursor(&self, path: &PathBuf, id: ThreadId, data: &[u8]) -> EditrResult<()> {
+	pub fn file_write_cursor(
+		&self,
+		path: &PathBuf,
+		id: ThreadId,
+		data: &[u8],
+	) -> EditrResult<usize> {
 		self.file_op(path, |file| file.write_at_cursor(id, data))
 	}
 
-	pub fn file_remove_cursor(&self, path: &PathBuf, id: ThreadId, len: usize) -> EditrResult<()> {
+	pub fn file_remove_cursor(
+		&self,
+		path: &PathBuf,
+		id: ThreadId,
+		len: usize,
+	) -> EditrResult<usize> {
 		self.file_op(path, |file| file.remove_at_cursor(id, len))
 	}
 
