@@ -186,7 +186,7 @@ pub enum Message {
 
 impl Message {
 	pub fn from_reader<R: Read>(reader: R) -> Result<Message, Box<dyn Error>> {
-		Ok(serde_json::from_reader(reader).map_err(|e| e.to_string())?)
+		Ok(serde_cbor::from_reader(reader).map_err(|e| e.to_string())?)
 	}
 
 	pub fn make_add_broadcast(offset: usize, data: &[u8]) -> Message {
