@@ -138,6 +138,11 @@ pub enum RemoveAtCursorResult {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub enum GetCursorsResult {
+	Ok((usize, Vec<usize>)),
+	Err(String),
+}
+#[derive(Serialize, Deserialize, Debug)]
 pub enum Message {
 	Invalid,
 	Echo(Vec<u8>),
@@ -168,6 +173,8 @@ pub enum Message {
 	WriteAtCursorResp(WriteAtCursorResult),
 	RemoveAtCursorReq(RemoveAtCursorReqData),
 	RemoveAtCursorResp(RemoveAtCursorResult),
+	GetCursorsReq,
+	GetCursorsResp(GetCursorsResult),
 }
 
 impl Message {
@@ -254,6 +261,16 @@ impl Message {
 				Ok(_) => (Message::RemoveAtCursorResp(RemoveAtCursorResult::Ok), false),
 				Err(e) => (
 					Message::RemoveAtCursorResp(RemoveAtCursorResult::Err(e.to_string())),
+					false,
+				),
+			},
+			Message::GetCursorsReq => match thread_local.get_cursors() {
+				Ok(cursors) => (
+					Message::GetCursorsResp(GetCursorsResult::Ok(cursors)),
+					false,
+				),
+				Err(e) => (
+					Message::GetCursorsResp(GetCursorsResult::Err(e.to_string())),
 					false,
 				),
 			},

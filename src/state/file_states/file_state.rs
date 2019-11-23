@@ -105,6 +105,19 @@ impl FileState {
 		})?)
 	}
 
+	pub fn get_cursors(&self, id: ThreadId) -> EditrResult<(usize, Vec<usize>)> {
+		Ok(self.clients_op(|clients| {
+			let found_value = match clients.get(&id) {
+				Some(value) => *value,
+				None => return Err("ID not found in clients".into()),
+			};
+
+			let others = clients.iter().map(|(_, value)| *value).collect();
+
+			Ok((found_value, others))
+		})?)
+	}
+
 	// Locks clients and applies op
 	fn clients_op<T, F: FnOnce(MutexGuard<HashMap<ThreadId, usize>>) -> EditrResult<T>>(
 		&self,

@@ -108,6 +108,10 @@ impl FileStates {
 		self.file_op(path, |file| file.remove_at_cursor(id, len))
 	}
 
+	pub fn get_cursors(&self, path: &PathBuf, id: ThreadId) -> EditrResult<(usize, Vec<usize>)> {
+		self.file_op(path, |file| file.get_cursors(id))
+	}
+
 	// Applies an op that requires a read lock on the underlying container
 	fn op<T, F: FnOnce(RwLockReadGuard<HashMap<PathBuf, FileState>>) -> EditrResult<T>>(
 		&self,

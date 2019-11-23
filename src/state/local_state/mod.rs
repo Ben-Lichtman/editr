@@ -163,6 +163,10 @@ impl LocalState {
 			.file_remove_cursor(self.get_opened()?, self.thread_id, len)
 	}
 
+	pub fn get_cursors(&self) -> EditrResult<(usize, Vec<usize>)> {
+		self.files.get_cursors(self.get_opened()?, self.thread_id)
+	}
+
 	fn get_opened(&self) -> EditrResult<&PathBuf> {
 		self.opened_file
 			.as_ref()
