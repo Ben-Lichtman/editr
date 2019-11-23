@@ -1,5 +1,4 @@
 use std::fs::{self, OpenOptions};
-use std::io::Read;
 use std::net::TcpStream;
 
 use std::path::PathBuf;
@@ -17,12 +16,6 @@ pub struct LocalState {
 	opened_file: Option<PathBuf>,
 }
 
-impl Read for LocalState {
-	fn read(&mut self, buffer: &mut [u8]) -> Result<usize, std::io::Error> {
-		self.socket.read(buffer)
-	}
-}
-
 impl LocalState {
 	pub fn new(
 		threads_out: shared_out::SharedOut,
@@ -38,6 +31,8 @@ impl LocalState {
 			opened_file: None,
 		})
 	}
+
+	pub fn get_message(&mut self) -> EditrResult<Message> { self.socket.get_message() }
 
 	pub fn canonical_home(&self) -> &PathBuf { &self.canonical_home }
 

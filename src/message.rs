@@ -186,7 +186,16 @@ pub enum Message {
 
 impl Message {
 	pub fn from_reader<R: Read>(reader: R) -> Result<Message, Box<dyn Error>> {
-		Ok(serde_json::from_reader(reader).map_err(|e| e.to_string())?)
+		// let mut buffer = [0u8; 4096 * 10];
+
+		// let counter = reader.read(&mut buffer)?;
+		// let deserialised = serde_json::from_slice(&buffer[..counter])?;
+
+		let deserialised = serde_json::from_reader(reader).map_err(|e| e.to_string())?;
+
+		println!("{:?}", deserialised);
+
+		Ok(deserialised)
 	}
 
 	pub fn make_add_broadcast(offset: usize, data: &[u8]) -> Message {

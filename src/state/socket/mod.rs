@@ -1,7 +1,6 @@
 pub mod shared_out;
 mod thread_io;
 
-use std::io::Read;
 use std::net::TcpStream;
 use std::thread::ThreadId;
 
@@ -9,17 +8,11 @@ use shared_out::SharedOut;
 use thread_io::ThreadIn;
 
 use crate::error::EditrResult;
+use crate::message::Message;
 
 pub struct Socket {
 	local_in: ThreadIn,
 	shared_out: SharedOut,
-}
-
-impl Read for Socket {
-	// Reads from reader into buffer
-	fn read(&mut self, buffer: &mut [u8]) -> Result<usize, std::io::Error> {
-		self.local_in.read(buffer)
-	}
 }
 
 impl Socket {
@@ -30,6 +23,8 @@ impl Socket {
 			shared_out: out,
 		})
 	}
+
+	pub fn get_message(&mut self) -> EditrResult<Message> { self.local_in.get_message() }
 
 	// Writes from buffer into thread_id's writer
 	pub fn write(&self, thread_id: ThreadId, buf: &[u8]) -> EditrResult<usize> {

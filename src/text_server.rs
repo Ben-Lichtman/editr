@@ -3,13 +3,12 @@ use std::net::{TcpListener, ToSocketAddrs};
 use std::path::Path;
 use std::thread::spawn;
 
-use crate::message::Message;
 use crate::state::*;
 
 // The main function run by the client thread
-fn client_thread(mut thread_local: &mut LocalState) -> Result<(), Box<dyn Error>> {
+fn client_thread(thread_local: &mut LocalState) -> Result<(), Box<dyn Error>> {
 	loop {
-		let msg = Message::from_reader(&mut thread_local)?;
+		let msg = thread_local.get_message()?;
 
 		println!("<=: {:?}", msg);
 
