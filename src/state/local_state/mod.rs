@@ -103,7 +103,7 @@ impl LocalState {
 		}
 
 		self.files
-			.open(canonical_path.clone(), self.thread_id, name.clone())?;
+			.open(canonical_path.clone(), self.thread_id, name)?;
 
 		self.opened_file = Some(canonical_path.clone());
 
