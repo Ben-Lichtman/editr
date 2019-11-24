@@ -53,8 +53,8 @@ fn client_thread(thread_local: &mut LocalState) -> Result<(), Box<dyn Error>> {
 	Ok(())
 }
 
-pub fn start<A: ToSocketAddrs>(path: &str, address: A) -> Result<(), Box<dyn Error>> {
-	let canonical_home = Path::new(path).canonicalize()?;
+pub fn start<A: ToSocketAddrs>(path: &Path, address: A) -> Result<(), Box<dyn Error>> {
+	let canonical_home = path.canonicalize()?;
 
 	let listener = TcpListener::bind(address)?;
 
