@@ -74,11 +74,15 @@ impl FileState {
 				None => return Err("ID not found in clients".into()),
 			};
 
+			println!("Found cursor at {}", found_value);
+
 			self.insert_at(found_value, data)?;
 
 			for (_, (found_offset, _)) in clients.iter_mut() {
 				if *found_offset >= found_value {
+					println!("Was {}", found_offset);
 					let new_offset_signed = *found_offset as isize + data.len() as isize;
+					println!("Now: {}", new_offset_signed);
 					*found_offset = new_offset_signed as usize;
 				}
 			}
@@ -93,17 +97,21 @@ impl FileState {
 				None => return Err("ID not found in clients".into()),
 			};
 
+			println!("Found cursor at {}", found_value);
+
 			self.remove_range(found_value, found_value + len)?;
 
 			for (_, (found_offset, _)) in clients.iter_mut() {
 				if *found_offset >= found_value {
+					println!("Was {}", found_offset);
 					let new_offset_signed = *found_offset as isize - len as isize;
-					let new_offset_signed = if new_offset_signed < *found_offset as isize {
-						*found_offset
+					let new_offset_signed = if new_offset_signed < found_value as isize {
+						found_value
 					}
 					else {
 						new_offset_signed as usize
 					};
+					println!("Now: {}", new_offset_signed);
 					*found_offset = new_offset_signed as usize;
 				}
 			}
