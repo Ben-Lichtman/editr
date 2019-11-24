@@ -98,6 +98,12 @@ impl FileState {
 			for (_, (found_offset, _)) in clients.iter_mut() {
 				if *found_offset >= found_value {
 					let new_offset_signed = *found_offset as isize - len as isize;
+					let new_offset_signed = if new_offset_signed < *found_offset as isize {
+						*found_offset
+					}
+					else {
+						new_offset_signed as usize
+					};
 					*found_offset = new_offset_signed as usize;
 				}
 			}
