@@ -11,10 +11,15 @@ fn main() {
 			text_server::start(&config.home, config.address).unwrap();
 		}
 		Err(e) => {
-			println!("{}", e.to_string())
+			println!("Error parsing arguments...");
+			println!("\t{}", e.to_string());
+			print_help();
 		}
 	}
+}
 
+fn print_help() {
+	println!("usage: server <home> <address>")
 }
 
 struct Config {
