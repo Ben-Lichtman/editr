@@ -1,4 +1,5 @@
 use std::error::Error;
+use std::io::Read;
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
@@ -7,109 +8,148 @@ use serde_json;
 
 use crate::state::*;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum CreateResult {
 	Ok,
 	Err(String),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum DeleteResult {
 	Ok,
 	Err(String),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct RenameReqData {
 	from: String,
 	to: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum RenameResult {
 	Ok,
 	Err(String),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
+pub struct OpenReqData {
+	file: String,
+	name: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub enum OpenResult {
 	Ok(PathBuf),
 	Err(String),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum CloseResult {
 	Ok,
 	Err(String),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct WriteReqData {
 	offset: usize,
 	data: Vec<u8>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum WriteResult {
 	Ok,
 	Err(String),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct UpdateAdd {
 	offset: usize,
 	data: Vec<u8>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct UpdateRemove {
 	offset: usize,
 	len: usize,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum UpdateData {
 	Add(UpdateAdd),
 	Remove(UpdateRemove),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ReadReqData {
 	offset: usize,
 	len: usize,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum ReadResult {
 	Ok(Vec<u8>),
 	Err(String),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct RemoveReqData {
 	offset: usize,
 	len: usize,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum RemoveResult {
 	Ok,
 	Err(String),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum SaveResult {
 	Ok,
 	Err(String),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum FilesListResult {
 	Ok(Vec<String>),
 	Err(String),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
+pub enum MoveCursorResult {
+	Ok,
+	Err(String),
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct WriteAtCursorReqData {
+	data: Vec<u8>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub enum WriteAtCursorResult {
+	Ok,
+	Err(String),
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RemoveAtCursorReqData {
+	len: usize,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub enum RemoveAtCursorResult {
+	Ok,
+	Err(String),
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub enum GetCursorsResult {
+	Ok((usize, Vec<(usize, Option<String>)>)),
+	Err(String),
+}
+#[derive(Serialize, Deserialize, Debug)]
 pub enum Message {
 	Invalid,
 	Echo(Vec<u8>),
@@ -119,7 +159,7 @@ pub enum Message {
 	DeleteResp(DeleteResult),
 	RenameReq(RenameReqData),
 	RenameResp(RenameResult),
-	OpenReq(String),
+	OpenReq(OpenReqData),
 	OpenResp(OpenResult),
 	CloseReq,
 	CloseResp(CloseResult),
@@ -134,11 +174,28 @@ pub enum Message {
 	SaveResp(SaveResult),
 	FilesListReq,
 	FilesListResp(FilesListResult),
+	MoveCursor(isize),
+	MoveCursorResp(MoveCursorResult),
+	WriteAtCursorReq(WriteAtCursorReqData),
+	WriteAtCursorResp(WriteAtCursorResult),
+	RemoveAtCursorReq(RemoveAtCursorReqData),
+	RemoveAtCursorResp(RemoveAtCursorResult),
+	GetCursorsReq,
+	GetCursorsResp(GetCursorsResult),
 }
 
 impl Message {
-	pub fn from_slice(slice: &[u8]) -> Result<Message, Box<dyn Error>> {
-		Ok(serde_json::from_slice(slice).map_err(|e| e.to_string())?)
+	pub fn from_reader<R: Read>(reader: R) -> Result<Message, Box<dyn Error>> {
+		// let mut buffer = [0u8; 4096 * 10];
+
+		// let counter = reader.read(&mut buffer)?;
+		// let deserialised = serde_json::from_slice(&buffer[..counter])?;
+
+		let deserialised = serde_json::from_reader(reader).map_err(|e| e.to_string())?;
+
+		println!("{:?}", deserialised);
+
+		Ok(deserialised)
 	}
 
 	pub fn make_add_broadcast(offset: usize, data: &[u8]) -> Message {
@@ -167,7 +224,7 @@ impl Message {
 				Ok(_) => (Message::RenameResp(RenameResult::Ok), false),
 				Err(e) => (Message::RenameResp(RenameResult::Err(e.to_string())), false),
 			},
-			Message::OpenReq(inner) => match thread_local.file_open(&inner) {
+			Message::OpenReq(inner) => match thread_local.file_open(&inner.file, inner.name) {
 				Ok(p) => (Message::OpenResp(OpenResult::Ok(p)), false),
 				Err(e) => (Message::OpenResp(OpenResult::Err(e.to_string())), false),
 			},
@@ -199,6 +256,37 @@ impl Message {
 				Ok(list) => (Message::FilesListResp(FilesListResult::Ok(list)), false),
 				Err(e) => (
 					Message::FilesListResp(FilesListResult::Err(e.to_string())),
+					false,
+				),
+			},
+			Message::MoveCursor(inner) => match thread_local.move_cursor(inner) {
+				Ok(_) => (Message::MoveCursorResp(MoveCursorResult::Ok), false),
+				Err(e) => (
+					Message::MoveCursorResp(MoveCursorResult::Err(e.to_string())),
+					false,
+				),
+			},
+			Message::WriteAtCursorReq(inner) => match thread_local.file_write_cursor(&inner.data) {
+				Ok(_) => (Message::WriteAtCursorResp(WriteAtCursorResult::Ok), false),
+				Err(e) => (
+					Message::WriteAtCursorResp(WriteAtCursorResult::Err(e.to_string())),
+					false,
+				),
+			},
+			Message::RemoveAtCursorReq(inner) => match thread_local.file_remove_cursor(inner.len) {
+				Ok(_) => (Message::RemoveAtCursorResp(RemoveAtCursorResult::Ok), false),
+				Err(e) => (
+					Message::RemoveAtCursorResp(RemoveAtCursorResult::Err(e.to_string())),
+					false,
+				),
+			},
+			Message::GetCursorsReq => match thread_local.get_cursors() {
+				Ok(cursors) => (
+					Message::GetCursorsResp(GetCursorsResult::Ok(cursors)),
+					false,
+				),
+				Err(e) => (
+					Message::GetCursorsResp(GetCursorsResult::Err(e.to_string())),
 					false,
 				),
 			},

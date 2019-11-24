@@ -32,6 +32,8 @@ impl LocalState {
 		})
 	}
 
+	pub fn get_message(&mut self) -> EditrResult<Message> { self.socket.get_message() }
+
 	pub fn canonical_home(&self) -> &PathBuf { &self.canonical_home }
 
 	pub fn contains_file(&self, path: &PathBuf) -> EditrResult<bool> { self.files.contains(path) }
@@ -84,14 +86,14 @@ impl LocalState {
 	pub fn files_list(&self) -> EditrResult<Vec<String>> {
 		let mut list = Vec::new();
 		for f in self.canonical_home.read_dir()? {
-			if let Some(name) = f?.file_name().into_string().ok() {
-				list.push(name);
+			if let Ok(name) = f?.file_name().into_string() {
+				list.push(name)
 			}
 		}
 		Ok(list)
 	}
 
-	pub fn file_open(&mut self, path: &str) -> EditrResult<PathBuf> {
+	pub fn file_open(&mut self, path: &str, name: Option<String>) -> EditrResult<PathBuf> {
 		// (currently) clients can only have one file open
 		self.file_close()?;
 
@@ -102,7 +104,8 @@ impl LocalState {
 			return Err("Invalid file path".into());
 		}
 
-		self.files.open(canonical_path.clone(), self.thread_id)?;
+		self.files
+			.open(canonical_path.clone(), self.thread_id, name)?;
 
 		self.opened_file = Some(canonical_path.clone());
 
@@ -116,10 +119,6 @@ impl LocalState {
 			self.opened_file = None;
 		}
 		Ok(())
-	}
-
-	pub fn socket_read(&mut self, buffer: &mut [u8]) -> EditrResult<usize> {
-		self.socket.read(buffer)
 	}
 
 	pub fn socket_write(&self, buffer: &[u8]) -> EditrResult<usize> {
@@ -148,8 +147,37 @@ impl LocalState {
 	// Saves file to disk
 	pub fn file_save(&self) -> EditrResult<()> { self.files.flush(self.get_opened()?) }
 
+	pub fn move_cursor(&self, offset: isize) -> EditrResult<()> {
+		self.files
+			.move_cursor(self.get_opened()?, self.thread_id, offset)
+	}
+
+	pub fn file_write_cursor(&self, data: &[u8]) -> EditrResult<()> {
+		let op_offset = self
+			.files
+			.file_write_cursor(self.get_opened()?, self.thread_id, &data)?;
+		// Sync neigbours with the data just written
+		self.broadcast_neighbours(Message::make_add_broadcast(op_offset, data))?;
+		Ok(())
+	}
+
+	pub fn file_remove_cursor(&self, len: usize) -> EditrResult<()> {
+		let op_offset = self
+			.files
+			.file_remove_cursor(self.get_opened()?, self.thread_id, len)?;
+		// Sync neighbours with deletion
+		self.broadcast_neighbours(Message::make_del_broadcast(op_offset, len))?;
+		Ok(())
+	}
+
+	pub fn get_cursors(&self) -> EditrResult<(usize, Vec<(usize, Option<String>)>)> {
+		self.files.get_cursors(self.get_opened()?, self.thread_id)
+	}
+
 	fn get_opened(&self) -> EditrResult<&PathBuf> {
-		self.opened_file.as_ref().ok_or("File not open".into())
+		self.opened_file
+			.as_ref()
+			.ok_or_else(|| "File not open".into())
 	}
 
 	// Broadcasts a message to other clients in the same file as self

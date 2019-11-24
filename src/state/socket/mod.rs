@@ -4,9 +4,11 @@ mod thread_io;
 use std::net::TcpStream;
 use std::thread::ThreadId;
 
-use crate::error::EditrResult;
 use shared_out::SharedOut;
 use thread_io::ThreadIn;
+
+use crate::error::EditrResult;
+use crate::message::Message;
 
 pub struct Socket {
 	local_in: ThreadIn,
@@ -22,8 +24,7 @@ impl Socket {
 		})
 	}
 
-	// Reads from reader into buffer
-	pub fn read(&mut self, buf: &mut [u8]) -> EditrResult<usize> { self.local_in.read(buf) }
+	pub fn get_message(&mut self) -> EditrResult<Message> { self.local_in.get_message() }
 
 	// Writes from buffer into thread_id's writer
 	pub fn write(&self, thread_id: ThreadId, buf: &[u8]) -> EditrResult<usize> {
